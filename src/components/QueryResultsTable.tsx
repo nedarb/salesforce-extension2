@@ -34,7 +34,7 @@ function RenderCell({ name, value, href }: { name: string; value: any; href?: st
 }
 
 export default function QueryResultsTable({ queryResults, cookie }: Props) {
-  if (!queryResults) return null;
+  if (!queryResults || !queryResults.records) return null;
   const keys = Object.keys(
     queryResults.records[0] || {},
   );

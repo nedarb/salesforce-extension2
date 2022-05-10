@@ -55,11 +55,13 @@ function getValueRenderer(onClick?: (path: string) => void) {
 
 export interface Props {
   url: string;
+  showAsTable?: boolean;
   cookie: browser.Cookies.Cookie;
   onUpdateUrl?: (updated: string) => void;
 }
-export default function ApiResults({ url, cookie, onUpdateUrl }: Props) {
-  const [showAsTable, setShowAsTable] = useLocalStorage(`query_result:show_as_table:${cookie.domain}`, false);
+export default function ApiResults({
+  url, cookie, onUpdateUrl, showAsTable,
+}: Props) {
   const { results, isLoading, error } = useSalesforceApi({
     url,
     cookie,
@@ -68,8 +70,6 @@ export default function ApiResults({ url, cookie, onUpdateUrl }: Props) {
   const valueRenderer = useMemo(() => {
     return getValueRenderer(onUpdateUrl);
   }, [onUpdateUrl]);
-
-  const handleToggleChange: ChangeEventHandler<HTMLInputElement> = useCallback((ev) => setShowAsTable(ev.target.checked), []);
 
   useEffect(() => {
     console.log(results);
@@ -89,7 +89,6 @@ export default function ApiResults({ url, cookie, onUpdateUrl }: Props) {
 
   return (
     <>
-      <Switch label="Show as table" checked={showAsTable} onChange={handleToggleChange} />
       {showAsTable ? <QueryResultsTable queryResults={results} cookie={cookie} /> : (
         <JSONTree
           data={results}
