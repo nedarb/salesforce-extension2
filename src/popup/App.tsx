@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import browser from 'webextension-polyfill';
 import {
-  Paper, LoadingOverlay, Button, Text, Table,
+  Textarea, LoadingOverlay, Button, Text, Table,
 } from '@mantine/core';
 import useCurrentTab from '../hooks/useCurrentTab';
 import useBrowserPermission from '../hooks/useBrowserPermission';
@@ -16,15 +16,30 @@ import normalizeSalesforceDomain, {
 } from '../common/SalesforceUtils';
 import SalesforceContext from '../contexts/SalesforceContext';
 import useLocalStorage from '../hooks/useLocalStorage';
+import useAsyncState from '../hooks/useAsyncState';
 
 interface SalesforceApiIdentity {
   display_name: string;
   email: string;
 }
 
-function RenderCell({ name, value }: { name: string; value: any }) {
+function RenderCell({ name, value, href }: { name: string; value: any; href?: string }) {
   if (typeof value === 'boolean') {
     return <td>{value ? '✔️' : '☐'}</td>;
+  }
+  if (value == null) {
+    return <td>-</td>;
+  }
+  if (typeof value === 'object') {
+    const keys = Object.keys(value).filter((key) => key !== 'attributes');
+    return <td>{keys.length === 1 ? value[keys[0] || ''] : keys.map((key) => `${key}: ${value[key]}`).join(', ')}</td>;
+  }
+  if (href && name === 'Name') {
+    return (
+      <td>
+        <a href={href} target="_blank">{value}</a>
+      </td>
+    );
   }
   return <td>{value}</td>;
 }
@@ -58,8 +73,8 @@ function LoggedIntoSalesforce({ cookie }: { cookie: browser.Cookies.Cookie }) {
       Logged in to {cookie.domain}
       <form>
         <LoadingOverlay visible={isLoading} />
-        <input
-          type="text"
+        <Textarea
+          autosize
           value={query}
           onChange={handleChange}
           disabled={isLoading}
@@ -90,21 +105,24 @@ function LoggedIntoSalesforce({ cookie }: { cookie: browser.Cookies.Cookie }) {
                       {headerKeys.map((key) => (
                         <th key={key}>{key}</th>
                       ))}
-                      {hasId && <th> </th>}
+                      {hasId && !hasName && <th> </th>}
                     </tr>
                   </thead>
-                  {queryResults.records.map((row, index) => {
-                    const unique = row.Id || row.attributes?.url || index;
-                    return (
-                      <tr key={unique}>
-                        <td>{index + 1}</td>
-                        {headerKeys.map((key) => (
-                          <RenderCell key={key} name={key} value={row[key]} />
-                        ))}
-                        {hasId && <td><a href={`https://${cookie.domain}/${row.Id}`} target="_blank">🌐</a></td>}
-                      </tr>
-                    );
-                  })}
+                  <tbody>
+                    {queryResults.records.map((row, index) => {
+                      const unique = row.Id || row.attributes?.url || index;
+                      const href = `https://${cookie.domain}/${row.Id}`;
+                      return (
+                        <tr key={unique}>
+                          <td>{index + 1}</td>
+                          {headerKeys.map((key) => (
+                            <RenderCell key={key} name={key} value={row[key]} href={href} />
+                          ))}
+                          {hasId && !hasName && <td><a href={href} target="_blank">🌐</a></td>}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
                 </Table>
               );
             })()}
@@ -116,14 +134,20 @@ function LoggedIntoSalesforce({ cookie }: { cookie: browser.Cookies.Cookie }) {
 
 const windowUrl = new URL(window.location.href);
 
+function getSalesforceTabs() {
+  return browser.tabs.query({ url: 'https://*.lightning.force.com/*' });
+}
+
 const App = () => {
-  const currentTab = useCurrentTab();
-  const currentTabUrl =
-    currentTab?.url ||
-    (() => {
-      const domain = windowUrl.searchParams.get('domain');
-      return domain ? `https://${domain}/` : undefined;
-    })();
+  const salesforceTabs = useAsyncState(getSalesforceTabs);
+  const salesforceTabDomains: Set<string | undefined> = new Set(salesforceTabs?.map((t) => t.url)
+    .map((url) => (url ? new URL(url) : null))
+    .filter((url) => !!url)
+    .map((url) => url?.host));
+  const currentTab = useCurrentTab('https://*.lightning.force.com/*');
+  const currentTabUrl = [currentTab?.url, ...salesforceTabs?.map((t) => t.url).filter(Boolean) || []].filter(Boolean)[0];
+  console.log('curentTabUrl', currentTabUrl);
+
   const [
     hasPermission,
     onRequestPermission,
@@ -146,6 +170,10 @@ const App = () => {
     useCache: true,
   });
 
+  useEffect(() => {
+    console.log('salesforceTabs', salesforceTabDomains, salesforceTabs?.map((t) => ([t.url, t.title])));
+  }, [salesforceTabs]);
+
   const url = currentTabUrl?.startsWith('http') ? new URL(currentTabUrl) : null;
 
   if (url && SalesforceDomains.find((domain) => url?.host.endsWith(domain))) {
@@ -157,6 +185,7 @@ const App = () => {
         <div>
           <Text>
             SALESFORCE DOMAIN: {url?.host}{' '}
+            <Button component="a" href={launchUrl} target="_blank" rel="noreferrer">Explore</Button>
             <a href={launchUrl} target="_blank" rel="noreferrer">
               Explore
             </a>
@@ -170,18 +199,20 @@ const App = () => {
 
     return (
       <SalesforceContext.Provider value={{ domain: url?.host, onSessionExpired: () => {} }}>
-        <div>
+        <Text size="xs">
           SALESFORCE DOMAIN: {url?.host}{' '}
-          <a href={launchUrl} target="_blank" rel="noreferrer">
-            Explore
-          </a>
+          <Button component="a" href={launchUrl} target="_blank" rel="noreferrer">Explore</Button>
           <p>
             {identityResults?.display_name} ({identityResults?.email})
           </p>
           {hasPermission && cookie && <LoggedIntoSalesforce cookie={cookie} />}
-        </div>
+        </Text>
       </SalesforceContext.Provider>
     );
+  }
+
+  if (salesforceTabDomains.size > 0) {
+
   }
 
   return (

@@ -12,7 +12,7 @@ import ApiResults from './ApiResults';
 
 export default function Query({ cookie }: { cookie: browser.Cookies.Cookie }) {
   const [query, setQuery] = useLocalStorage<string>(
-    'currentQuery',
+    `currentQuery:${cookie.domain}`,
     'SELECT count() from User',
   );
   const [debounced, immediatelyUpdate] = useDebounce(query);
@@ -42,7 +42,7 @@ export default function Query({ cookie }: { cookie: browser.Cookies.Cookie }) {
 
   return (
     <form onSubmit={handleSubmit}>
-      <input type='text' name='query' value={query} />
+      <input type="text" name="query" value={query} />
       <ApiResults url={url} cookie={cookie} onUpdateUrl={forcePathUpdate} />
     </form>
   );

@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react';
 import browser from 'webextension-polyfill';
 
-export default function useCurrentTab(): browser.Tabs.Tab | undefined {
+export default function useCurrentTab(urlFilter?: string): browser.Tabs.Tab | undefined {
   const [tab, setTab] = useState<any>(null);
   useEffect(() => {
-    browser.tabs.query({ active: true, currentWindow: true }).then((tabs) => {
+    const filters: browser.Tabs.QueryQueryInfoType = { active: true, currentWindow: true };
+    if (urlFilter) { filters.url = urlFilter; }
+    browser.tabs.query(filters).then((tabs) => {
       if (tabs.length > 0) {
         const currentTab = tabs[0];
         setTab(currentTab);
       }
     });
-  }, []);
+  }, [urlFilter]);
 
   return tab;
 }
