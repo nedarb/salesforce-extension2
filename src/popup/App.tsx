@@ -15,6 +15,7 @@ import normalizeSalesforceDomain, {
   SalesforceDomains,
 } from '../common/SalesforceUtils';
 import SalesforceContext from '../contexts/SalesforceContext';
+import useLocalStorage from '../hooks/useLocalStorage';
 
 interface SalesforceApiIdentity {
   display_name: string;
@@ -29,9 +30,7 @@ function RenderCell({ name, value }: { name: string; value: any }) {
 }
 
 function LoggedIntoSalesforce({ cookie }: { cookie: browser.Cookies.Cookie }) {
-  const [query, setQuery] = useState(
-    'SELECT Id, Name, IsActive FROM User LIMIT 10',
-  );
+  const [query, setQuery] = useLocalStorage(`popup_query:${cookie.domain}`, 'SELECT Id, Name, IsActive FROM User LIMIT 10');
   const [debounced] = useDebounce(query);
   const {
     results: queryExplainResults,
@@ -76,34 +75,37 @@ function LoggedIntoSalesforce({ cookie }: { cookie: browser.Cookies.Cookie }) {
         <p>
           {queryResults &&
             (() => {
-              const headerKeys = Object.keys(
+              const keys = Object.keys(
                 queryResults.records[0] || {},
-              ).filter((key) => key !== 'attributes');
+              );
+              const headerKeys = keys.filter((key) => key !== 'attributes' && key !== 'Id');
+              const hasId = keys.includes('Id');
+              const hasName = keys.includes('Name');
               return (
-                <div>
-                  Results ({queryResults.totalSize})
-                  <Table verticalSpacing="xs" fontSize="xs" striped>
-                    <thead>
-                      <tr>
-                        <th> </th>
+                <Table verticalSpacing="xs" fontSize="xs" striped>
+                  <caption>{queryResults.records.length} results</caption>
+                  <thead>
+                    <tr>
+                      <th> </th>
+                      {headerKeys.map((key) => (
+                        <th key={key}>{key}</th>
+                      ))}
+                      {hasId && <th> </th>}
+                    </tr>
+                  </thead>
+                  {queryResults.records.map((row, index) => {
+                    const unique = row.Id || row.attributes?.url || index;
+                    return (
+                      <tr key={unique}>
+                        <td>{index + 1}</td>
                         {headerKeys.map((key) => (
-                          <th key={key}>{key}</th>
+                          <RenderCell key={key} name={key} value={row[key]} />
                         ))}
+                        {hasId && <td><a href={`https://${cookie.domain}/${row.Id}`} target="_blank">🌐</a></td>}
                       </tr>
-                    </thead>
-                    {queryResults.records.map((row, index) => {
-                      const unique = row.Id || row.attributes?.url || index;
-                      return (
-                        <tr key={unique}>
-                          <td>{index + 1}</td>
-                          {headerKeys.map((key) => (
-                            <RenderCell key={key} name={key} value={row[key]} />
-                          ))}
-                        </tr>
-                      );
-                    })}
-                  </Table>
-                </div>
+                    );
+                  })}
+                </Table>
               );
             })()}
         </p>
@@ -130,14 +132,6 @@ const App = () => {
   const cookie = useBrowserCookie({
     url: hasPermission ? normalizeSalesforceDomain(currentTabUrl) : undefined,
     name: 'sid',
-  });
-
-  const { results: queryResults, isLoading } = useSalesforceQuery<{
-    done: boolean;
-    totalSize: number;
-  }>({
-    query: 'SELECT count() FROM Contact',
-    cookie,
   });
 
   const { results: apiResults } = useSalesforceApi<{ identity: string }>({
@@ -173,6 +167,7 @@ const App = () => {
         </div>
       );
     }
+
     return (
       <SalesforceContext.Provider value={{ domain: url?.host, onSessionExpired: () => {} }}>
         <div>
@@ -184,20 +179,6 @@ const App = () => {
             {identityResults?.display_name} ({identityResults?.email})
           </p>
           {hasPermission && cookie && <LoggedIntoSalesforce cookie={cookie} />}
-          <p>
-            {isLoading ? (
-              'querying...'
-            ) : (
-              <span>Total contacts: {queryResults?.totalSize}</span>
-            )}
-          </p>
-          <p>
-            {hasPermission === false && (
-            <button type="button" onClick={onRequestPermission}>
-              Request
-            </button>
-            )}
-          </p>
         </div>
       </SalesforceContext.Provider>
     );
