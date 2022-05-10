@@ -8,7 +8,7 @@ import React, {
   useState,
 } from 'react';
 import browser from 'webextension-polyfill';
-import { AppShell, Tabs, Header } from '@mantine/core';
+import { Paper, Tabs, Button, Text } from '@mantine/core';
 import normalizeSalesforceDomain from '../common/SalesforceUtils';
 import useBrowserCookie from '../hooks/useBrowserCookie';
 import useBrowserPermission from '../hooks/useBrowserPermission';
@@ -50,8 +50,8 @@ function LoggedIntoSalesforce({ cookie }: { cookie: browser.Cookies.Cookie }) {
     setPath(e.target.value.trim());
   const handleSubmit: FormEventHandler<HTMLFormElement> = (e) => {
     e.preventDefault();
-    const updatedPath = e.currentTarget.querySelector('input[name="path"]')
-      ?.value;
+    const updatedPath =
+      e.currentTarget.querySelector('input[name="path"]')?.value;
     if (updatedPath) {
       setPath(updatedPath);
       immediatelyUpdate(updatedPath);
@@ -100,11 +100,8 @@ const App = () => {
   const domain = normalizeSalesforceDomain(
     url.searchParams.get('domain') ?? undefined,
   );
-  const [
-    hasPermission,
-    onRequestPermission,
-    onRemovePermission,
-  ] = useBrowserPermission(domain);
+  const [hasPermission, onRequestPermission, onRemovePermission] =
+    useBrowserPermission(domain);
   const [sessionExpired, setSessionExpired] = useState(false);
 
   const cookie = useBrowserCookie({
@@ -137,6 +134,15 @@ const App = () => {
           {domain}
         </a>
       </div>
+    );
+  }
+
+  if (!hasPermission) {
+    return (
+      <Paper shadow='xs' p='md'>
+        <Text>No permission for {domain}</Text>
+        <Button onClick={onRequestPermission}>Request</Button>
+      </Paper>
     );
   }
 

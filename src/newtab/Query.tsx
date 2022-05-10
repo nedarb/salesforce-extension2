@@ -11,13 +11,17 @@ import useLocalStorage from '../hooks/useLocalStorage';
 import ApiResults from './ApiResults';
 
 export default function Query({ cookie }: { cookie: browser.Cookies.Cookie }) {
-  const [query, setQuery] = useLocalStorage<string>('SELECT count() from User');
+  const [query, setQuery] = useLocalStorage<string>(
+    'currentQuery',
+    'SELECT count() from User',
+  );
   const [debounced, immediatelyUpdate] = useDebounce(query);
 
   const handleSubmit: FormEventHandler<HTMLFormElement> = (e) => {
     e.preventDefault();
-    const updatedQuery = e.currentTarget.querySelector('input[name="query"]')
-      ?.value;
+    const updatedQuery = e.currentTarget.querySelector(
+      'input[name="query"]',
+    )?.value;
     if (updatedQuery) {
       setQuery(updatedQuery);
       immediatelyUpdate(updatedQuery);
