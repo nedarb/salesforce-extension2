@@ -1,5 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import browser from 'webextension-polyfill';
+import {
+  Paper, Tabs, Button, Text,
+} from '@mantine/core';
 import useCurrentTab from '../hooks/useCurrentTab';
 import useBrowserPermission from '../hooks/useBrowserPermission';
 import useBrowserCookie from '../hooks/useBrowserCookie';
@@ -11,6 +14,7 @@ import useDebounce from '../hooks/useDebounce';
 import normalizeSalesforceDomain, {
   SalesforceDomains,
 } from '../common/SalesforceUtils';
+import SalesforceContext from '../contexts/SalesforceContext';
 
 interface SalesforceApiIdentity {
   display_name: string;
@@ -55,7 +59,7 @@ function LoggedIntoSalesforce({ cookie }: { cookie: browser.Cookies.Cookie }) {
       Logged in to {cookie.domain}
       <form>
         <input
-          type='text'
+          type="text"
           value={query}
           onChange={handleChange}
           disabled={isLoading}
@@ -149,49 +153,58 @@ const App = () => {
 
   const url = currentTabUrl?.startsWith('http') ? new URL(currentTabUrl) : null;
 
-  if (SalesforceDomains.find((domain) => url?.host.endsWith(domain))) {
+  if (url && SalesforceDomains.find((domain) => url?.host.endsWith(domain))) {
     const launchUrl = `${browser.runtime.getURL('./newtab.html')}?domain=${
       url?.host
     }`;
+    if (hasPermission === false) {
+      return (
+        <div>
+          <Text>
+            SALESFORCE DOMAIN: {url?.host}{' '}
+            <a href={launchUrl} target="_blank" rel="noreferrer">
+              Explore
+            </a>
+          </Text>
+          <Button onClick={onRequestPermission}>
+            Give permission to access {url.host}
+          </Button>
+        </div>
+      );
+    }
     return (
-      <div>
-        SALESFORCE DOMAIN: {url?.host}{' '}
-        <a href={launchUrl} target='_blank'>
-          Explore
-        </a>
-        <p>
-          {identityResults?.display_name} ({identityResults?.email})
-        </p>
-        {hasPermission && cookie && <LoggedIntoSalesforce cookie={cookie} />}
-        <p>
-          {isLoading ? (
-            'querying...'
-          ) : (
-            <span>Total contacts: {queryResults?.totalSize}</span>
-          )}
-        </p>
-        <p>
-          {hasPermission === false && (
-            <button type='button' onClick={onRequestPermission}>
+      <SalesforceContext.Provider value={{ domain: url?.host, onSessionExpired: () => {} }}>
+        <div>
+          SALESFORCE DOMAIN: {url?.host}{' '}
+          <a href={launchUrl} target="_blank" rel="noreferrer">
+            Explore
+          </a>
+          <p>
+            {identityResults?.display_name} ({identityResults?.email})
+          </p>
+          {hasPermission && cookie && <LoggedIntoSalesforce cookie={cookie} />}
+          <p>
+            {isLoading ? (
+              'querying...'
+            ) : (
+              <span>Total contacts: {queryResults?.totalSize}</span>
+            )}
+          </p>
+          <p>
+            {hasPermission === false && (
+            <button type="button" onClick={onRequestPermission}>
               Request
             </button>
-          )}
-        </p>
-      </div>
+            )}
+          </p>
+        </div>
+      </SalesforceContext.Provider>
     );
   }
 
   return (
     <div>
-      Get started at './src/popup/App.tsx'
-      {currentTab != null ? 'has tab' : 'no tab'}
-      {JSON.stringify(hasPermission)}
-      {JSON.stringify(currentTab)}
-      {hasPermission === false && (
-        <button type='button' onClick={onRequestPermission}>
-          Request
-        </button>
-      )}
+      Open a Salesforce tab to explore the org.
     </div>
   );
 };
