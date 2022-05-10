@@ -17,6 +17,7 @@ import normalizeSalesforceDomain, {
 import SalesforceContext from '../contexts/SalesforceContext';
 import useLocalStorage from '../hooks/useLocalStorage';
 import useAsyncState from '../hooks/useAsyncState';
+import QueryResultsTable from '../components/QueryResultsTable';
 
 interface SalesforceApiIdentity {
   display_name: string;
@@ -88,44 +89,7 @@ function LoggedIntoSalesforce({ cookie }: { cookie: browser.Cookies.Cookie }) {
             ))}
         </p>
         <p>
-          {queryResults &&
-            (() => {
-              const keys = Object.keys(
-                queryResults.records[0] || {},
-              );
-              const headerKeys = keys.filter((key) => key !== 'attributes' && key !== 'Id');
-              const hasId = keys.includes('Id');
-              const hasName = keys.includes('Name');
-              return (
-                <Table verticalSpacing="xs" fontSize="xs" striped>
-                  <caption>{queryResults.records.length} results</caption>
-                  <thead>
-                    <tr>
-                      <th> </th>
-                      {headerKeys.map((key) => (
-                        <th key={key}>{key}</th>
-                      ))}
-                      {hasId && !hasName && <th> </th>}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {queryResults.records.map((row, index) => {
-                      const unique = row.Id || row.attributes?.url || index;
-                      const href = `https://${cookie.domain}/${row.Id}`;
-                      return (
-                        <tr key={unique}>
-                          <td>{index + 1}</td>
-                          {headerKeys.map((key) => (
-                            <RenderCell key={key} name={key} value={row[key]} href={href} />
-                          ))}
-                          {hasId && !hasName && <td><a href={href} target="_blank">🌐</a></td>}
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </Table>
-              );
-            })()}
+          {queryResults && <QueryResultsTable queryResults={queryResults} cookie={cookie} />}
         </p>
       </form>
     </div>

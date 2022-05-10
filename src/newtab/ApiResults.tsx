@@ -1,10 +1,13 @@
 import React, {
+  ChangeEventHandler,
   useCallback, useEffect, useMemo, useState,
 } from 'react';
 import browser from 'webextension-polyfill';
 import { JSONTree } from 'react-json-tree';
-import { LoadingOverlay } from '@mantine/core';
+import { LoadingOverlay, Switch } from '@mantine/core';
 import { useSalesforceApi } from '../hooks/useSalesforceQuery';
+import QueryResultsTable from '../components/QueryResultsTable';
+import useLocalStorage from '../hooks/useLocalStorage';
 
 function getItemString(
   nodeType: string,
@@ -56,6 +59,7 @@ export interface Props {
   onUpdateUrl?: (updated: string) => void;
 }
 export default function ApiResults({ url, cookie, onUpdateUrl }: Props) {
+  const [showAsTable, setShowAsTable] = useLocalStorage(`query_result:show_as_table:${cookie.domain}`, false);
   const { results, isLoading, error } = useSalesforceApi({
     url,
     cookie,
@@ -64,6 +68,8 @@ export default function ApiResults({ url, cookie, onUpdateUrl }: Props) {
   const valueRenderer = useMemo(() => {
     return getValueRenderer(onUpdateUrl);
   }, [onUpdateUrl]);
+
+  const handleToggleChange: ChangeEventHandler<HTMLInputElement> = useCallback((ev) => setShowAsTable(ev.target.checked), []);
 
   useEffect(() => {
     console.log(results);
@@ -82,10 +88,15 @@ export default function ApiResults({ url, cookie, onUpdateUrl }: Props) {
   }
 
   return (
-    <JSONTree
-      data={results}
-      getItemString={getItemString}
-      valueRenderer={valueRenderer}
-    />
+    <>
+      <Switch label="Show as table" checked={showAsTable} onChange={handleToggleChange} />
+      {showAsTable ? <QueryResultsTable queryResults={results} cookie={cookie} /> : (
+        <JSONTree
+          data={results}
+          getItemString={getItemString}
+          valueRenderer={valueRenderer}
+        />
+      )}
+    </>
   );
 }
