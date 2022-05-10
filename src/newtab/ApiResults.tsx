@@ -1,6 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, {
+  useCallback, useEffect, useMemo, useState,
+} from 'react';
 import browser from 'webextension-polyfill';
 import { JSONTree } from 'react-json-tree';
+import { LoadingOverlay } from '@mantine/core';
 import { useSalesforceApi } from '../hooks/useSalesforceQuery';
 
 function getItemString(
@@ -14,7 +17,7 @@ function getItemString(
   const name =
     data?.id || data?.name || data?.relationshipName || data?.Id || data?.Name;
   return (
-    <span class='foobar'>
+    <span className="foobar">
       {name && <span>{name}</span>} {itemType} {itemString}
     </span>
   );
@@ -38,7 +41,7 @@ function getValueRenderer(onClick?: (path: string) => void) {
         [value],
       );
       return (
-        <a className='nav' href='#' onClick={handleClick}>
+        <a className="nav" href="#" onClick={handleClick}>
           {valueAsString}
         </a>
       );
@@ -75,7 +78,7 @@ export default function ApiResults({ url, cookie, onUpdateUrl }: Props) {
     );
   }
   if (isLoading) {
-    return <div>LOADING</div>;
+    return <LoadingOverlay visible={isLoading} />;
   }
 
   return (

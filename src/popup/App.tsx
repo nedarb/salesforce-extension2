@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import browser from 'webextension-polyfill';
 import {
-  Paper, Tabs, Button, Text,
+  Paper, LoadingOverlay, Button, Text, Table,
 } from '@mantine/core';
 import useCurrentTab from '../hooks/useCurrentTab';
 import useBrowserPermission from '../hooks/useBrowserPermission';
@@ -58,6 +58,7 @@ function LoggedIntoSalesforce({ cookie }: { cookie: browser.Cookies.Cookie }) {
     <div>
       Logged in to {cookie.domain}
       <form>
+        <LoadingOverlay visible={isLoading} />
         <input
           type="text"
           value={query}
@@ -81,7 +82,7 @@ function LoggedIntoSalesforce({ cookie }: { cookie: browser.Cookies.Cookie }) {
               return (
                 <div>
                   Results ({queryResults.totalSize})
-                  <table>
+                  <Table verticalSpacing="xs" fontSize="xs" striped>
                     <thead>
                       <tr>
                         <th> </th>
@@ -101,7 +102,7 @@ function LoggedIntoSalesforce({ cookie }: { cookie: browser.Cookies.Cookie }) {
                         </tr>
                       );
                     })}
-                  </table>
+                  </Table>
                 </div>
               );
             })()}
