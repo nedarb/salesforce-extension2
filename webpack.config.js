@@ -90,7 +90,7 @@ module.exports = (env) => {
         import: './src/serviceworker/index.ts',
         filename: 'serviceworker.js',
       }),
-      ...getEntries('UIElements'),
+      // ...getEntries('UIElements'),
       ...getEntries('scripts', 'index.ts'),
     }),
     output: {
@@ -105,7 +105,7 @@ module.exports = (env) => {
             loader: 'babel-loader',
             options: {
               presets: [
-                '@babel/preset-env',
+                // '@babel/preset-env',
                 ['@babel/preset-react', { runtime: 'automatic' }],
                 '@babel/preset-typescript',
               ],
@@ -180,7 +180,7 @@ module.exports = (env) => {
           chunks: ['onboarding'],
         }),
       ),
-      ...setUIElementHtml(),
+      // ...setUIElementHtml(),
       new CopyPlugin({
         patterns: removeEmpty([
           ifDirIsNotEmpty(path.join(__dirname, 'public', 'icons'), {
@@ -206,6 +206,10 @@ module.exports = (env) => {
     ]),
     resolve: {
       extensions: ['.tsx', '.ts', '.js', '.jsx'],
+      alias: {
+        react: 'preact/compat',
+        'react-dom': 'preact/compat',
+      },
     },
     devtool: ifProd(false, 'source-map'),
     devServer: {

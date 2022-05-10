@@ -3,6 +3,7 @@
   "background": {
     "service_worker": "serviceWorker.js"
   },
+  "options_page": "options.html",
   "action": {
     "default_icon": {
       "16": "icons/icon16.png",
@@ -22,5 +23,8 @@
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
-  }
+  },
+  "host_permissions": ["https://*.my.salesforce.com/*"],
+  "permissions": ["activeTab"],
+  "optional_permissions": ["cookies"]
 }
