@@ -1,10 +1,10 @@
 export const SalesforceDomains = ['.lightning.force.com', '.my.salesforce.com'];
 
-export default function normalizeSalesforceDomain(
+export default function urlToSalesforceMyDomain(
   url?: string,
 ): string | undefined {
   if (url && url.indexOf('://') < 0) {
-    return normalizeSalesforceDomain(`https://${url}`);
+    return urlToSalesforceMyDomain(`https://${url}`);
   }
 
   const urlObject = url?.startsWith('http') ? new URL(url) : null;

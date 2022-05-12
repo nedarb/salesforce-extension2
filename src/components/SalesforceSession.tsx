@@ -1,7 +1,7 @@
 import { Button, Paper, Text } from '@mantine/core';
 import React, { ReactNode, useCallback, useState } from 'react';
 
-import normalizeSalesforceDomain from '../common/SalesforceUtils';
+import urlToSalesforceMyDomain from '../common/SalesforceUtils';
 import SalesforceContext from '../contexts/SalesforceContext';
 import useBrowserCookie from '../hooks/useBrowserCookie';
 import useBrowserPermission from '../hooks/useBrowserPermission';
@@ -11,7 +11,7 @@ interface Props {
     children: ReactNode;
 }
 export default function SalesforceSession ({ domain: simpleDomain, children } : Props) {
-  const domain = normalizeSalesforceDomain(simpleDomain);
+  const domain = urlToSalesforceMyDomain(simpleDomain);
   const [hasPermission, onRequestPermission, onRemovePermission] =
       useBrowserPermission(domain);
   const [sessionExpired, setSessionExpired] = useState(false);

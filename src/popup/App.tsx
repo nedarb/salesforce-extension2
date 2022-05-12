@@ -1,4 +1,6 @@
-import React, { useContext, useEffect, useState } from 'react';
+import React, {
+  useCallback, useContext, useEffect, useState,
+} from 'react';
 import browser from 'webextension-polyfill';
 import {
   Textarea, LoadingOverlay, Button, Text, Table, Paper,
@@ -11,7 +13,7 @@ import useSalesforceQuery, {
   useSalesforceQueryExplain,
 } from '../hooks/useSalesforceQuery';
 import useDebounce from '../hooks/useDebounce';
-import normalizeSalesforceDomain, {
+import urlToSalesforceMyDomain, {
   SalesforceDomains,
 } from '../common/SalesforceUtils';
 import SalesforceContext from '../contexts/SalesforceContext';
@@ -19,6 +21,7 @@ import useLocalStorage from '../hooks/useLocalStorage';
 import useAsyncState from '../hooks/useAsyncState';
 import QueryResultsTable from '../components/QueryResultsTable';
 import SalesforceSession from '../components/SalesforceSession';
+import CookieChooser from '../components/CookieChooser';
 
 interface SalesforceApiIdentity {
   display_name: string;
@@ -88,9 +91,7 @@ function LoggedIntoSalesforce() {
               </div>
             ))}
       </p>
-      <p>
-        {queryResults && <QueryResultsTable queryResults={queryResults} cookie={cookie} />}
-      </p>
+      {queryResults && <QueryResultsTable queryResults={queryResults} cookie={cookie} />}
     </form>
   );
 }
@@ -105,12 +106,12 @@ const App = () => {
     .map((url) => (url ? new URL(url) : null))
     .filter((url) => !!url)
     .map((url) => url?.host));
+  const [specificCookie, setSpecificCookie] = useState<browser.Cookies.Cookie | undefined>();
   const [currentTab, isCurrentTabLoading] = useCurrentTab('https://*.lightning.force.com/*');
-  const currentTabUrl = [currentTab?.url, ...salesforceTabs?.map((t) => t.url).filter(Boolean) || []].filter(Boolean)[0];
-  console.log('curentTabUrl', currentTabUrl);
+  const currentTabUrl = [specificCookie?.domain ? `https://${specificCookie.domain}` : undefined, currentTab?.url, ...salesforceTabs?.map((t) => t.url).filter(Boolean) || []].filter(Boolean)[0];
 
   const [cookie, isCookieLoading] = useBrowserCookie({
-    url: normalizeSalesforceDomain(currentTabUrl),
+    url: urlToSalesforceMyDomain(currentTabUrl),
     name: 'sid',
   });
 
@@ -128,6 +129,13 @@ const App = () => {
     useCache: true,
   });
 
+  const handleCookieChosen = useCallback((c: browser.Cookies.Cookie) => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('domain', c.domain);
+    window.history.pushState({}, 'Title', url.toString());
+    setSpecificCookie(c);
+  }, []);
+
   useEffect(() => {
     console.log('salesforceTabs', salesforceTabDomains, salesforceTabs?.map((t) => ([t.url, t.title])));
   }, [salesforceTabs]);
@@ -144,7 +152,7 @@ const App = () => {
     return (
       <SalesforceSession domain={url.host}>
         <Text size="xs">
-          SALESFORCE DOMAIN: {url?.host}{' '}
+          <CookieChooser defaultDomain={url.host} onCookieChosen={handleCookieChosen} />
           <Button component="a" href={launchUrl} target="_blank" rel="noreferrer">Explore</Button>
           <p>
             {identityResults?.display_name} ({identityResults?.email})
@@ -159,7 +167,9 @@ const App = () => {
     <Paper shadow="xs" p="md">
       <Text>
         Open a Salesforce tab to explore the org.
+        {specificCookie?.domain}
       </Text>
+      <CookieChooser onCookieChosen={handleCookieChosen} />
       <Button component="a" href="https://login.salesforce.com" target="_blank" rel="noreferrer">Log back in</Button>
     </Paper>
   );

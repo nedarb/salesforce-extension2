@@ -206,10 +206,10 @@ module.exports = (env) => {
     ]),
     resolve: {
       extensions: ['.tsx', '.ts', '.js', '.jsx'],
-      alias: {
-        react: 'preact/compat',
-        'react-dom': 'preact/compat',
-      },
+      // alias: {
+      //   react: 'preact/compat',
+      //   'react-dom': 'preact/compat',
+      // },
     },
     devtool: ifProd(false, 'source-map'),
     devServer: {

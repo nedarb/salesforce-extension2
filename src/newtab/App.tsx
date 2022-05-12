@@ -12,7 +12,7 @@ import browser from 'webextension-polyfill';
 import {
   Paper, Tabs, Button, Text,
 } from '@mantine/core';
-import normalizeSalesforceDomain from '../common/SalesforceUtils';
+import urlToSalesforceMyDomain from '../common/SalesforceUtils';
 import useBrowserCookie from '../hooks/useBrowserCookie';
 import useDebounce from '../hooks/useDebounce';
 import useHash from '../hooks/useHash';
@@ -101,7 +101,7 @@ function LoggedIntoSalesforce() {
 }
 
 const App = () => {
-  const domain = normalizeSalesforceDomain(
+  const domain = urlToSalesforceMyDomain(
     url.searchParams.get('domain') ?? undefined,
   );
 
