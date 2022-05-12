@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import browser from 'webextension-polyfill';
 import {
-  Textarea, LoadingOverlay, Button, Text, Table,
+  Textarea, LoadingOverlay, Button, Text, Table, Paper,
 } from '@mantine/core';
 import useCurrentTab from '../hooks/useCurrentTab';
 import useBrowserPermission from '../hooks/useBrowserPermission';
@@ -18,6 +18,7 @@ import SalesforceContext from '../contexts/SalesforceContext';
 import useLocalStorage from '../hooks/useLocalStorage';
 import useAsyncState from '../hooks/useAsyncState';
 import QueryResultsTable from '../components/QueryResultsTable';
+import SalesforceSession from '../components/SalesforceSession';
 
 interface SalesforceApiIdentity {
   display_name: string;
@@ -45,7 +46,8 @@ function RenderCell({ name, value, href }: { name: string; value: any; href?: st
   return <td>{value}</td>;
 }
 
-function LoggedIntoSalesforce({ cookie }: { cookie: browser.Cookies.Cookie }) {
+function LoggedIntoSalesforce() {
+  const { cookie } = useContext(SalesforceContext);
   const [query, setQuery] = useLocalStorage(`popup_query:${cookie.domain}`, 'SELECT Id, Name, IsActive FROM User LIMIT 10');
   const [debounced] = useDebounce(query);
   const {
@@ -70,57 +72,49 @@ function LoggedIntoSalesforce({ cookie }: { cookie: browser.Cookies.Cookie }) {
   const handleChange = (e) => setQuery(e.target.value.trim());
 
   return (
-    <div>
-      Logged in to {cookie.domain}
-      <form>
-        <LoadingOverlay visible={isLoading} />
-        <Textarea
-          autosize
-          value={query}
-          onChange={handleChange}
-          disabled={isLoading}
-        />
-        <p>
-          {queryExplainError &&
+    <form>
+      <LoadingOverlay visible={isLoading} />
+      <Textarea
+        autosize
+        value={query}
+        onChange={handleChange}
+        disabled={isLoading}
+      />
+      <p>
+        {queryExplainError &&
             queryExplainError.map((e) => (
               <div key={e.errorCode}>
                 {e.errorCode}: {e.message}
               </div>
             ))}
-        </p>
-        <p>
-          {queryResults && <QueryResultsTable queryResults={queryResults} cookie={cookie} />}
-        </p>
-      </form>
-    </div>
+      </p>
+      <p>
+        {queryResults && <QueryResultsTable queryResults={queryResults} cookie={cookie} />}
+      </p>
+    </form>
   );
 }
-
-const windowUrl = new URL(window.location.href);
 
 function getSalesforceTabs() {
   return browser.tabs.query({ url: 'https://*.lightning.force.com/*' });
 }
 
 const App = () => {
-  const salesforceTabs = useAsyncState(getSalesforceTabs);
+  const [salesforceTabs, isSalesforceTabsLoading] = useAsyncState(getSalesforceTabs);
   const salesforceTabDomains: Set<string | undefined> = new Set(salesforceTabs?.map((t) => t.url)
     .map((url) => (url ? new URL(url) : null))
     .filter((url) => !!url)
     .map((url) => url?.host));
-  const currentTab = useCurrentTab('https://*.lightning.force.com/*');
+  const [currentTab, isCurrentTabLoading] = useCurrentTab('https://*.lightning.force.com/*');
   const currentTabUrl = [currentTab?.url, ...salesforceTabs?.map((t) => t.url).filter(Boolean) || []].filter(Boolean)[0];
   console.log('curentTabUrl', currentTabUrl);
 
-  const [
-    hasPermission,
-    onRequestPermission,
-    onRemovePermission,
-  ] = useBrowserPermission(currentTabUrl);
-  const cookie = useBrowserCookie({
-    url: hasPermission ? normalizeSalesforceDomain(currentTabUrl) : undefined,
+  const [cookie, isCookieLoading] = useBrowserCookie({
+    url: normalizeSalesforceDomain(currentTabUrl),
     name: 'sid',
   });
+
+  const isLoadingPrimitives = isSalesforceTabsLoading || isCurrentTabLoading || isCookieLoading;
 
   const { results: apiResults } = useSalesforceApi<{ identity: string }>({
     url: '/services/data/v50.0',
@@ -138,51 +132,36 @@ const App = () => {
     console.log('salesforceTabs', salesforceTabDomains, salesforceTabs?.map((t) => ([t.url, t.title])));
   }, [salesforceTabs]);
 
+  if (isLoadingPrimitives) { return null; }
+
   const url = currentTabUrl?.startsWith('http') ? new URL(currentTabUrl) : null;
 
   if (url && SalesforceDomains.find((domain) => url?.host.endsWith(domain))) {
     const launchUrl = `${browser.runtime.getURL('./newtab.html')}?domain=${
       url?.host
     }`;
-    if (hasPermission === false) {
-      return (
-        <div>
-          <Text>
-            SALESFORCE DOMAIN: {url?.host}{' '}
-            <Button component="a" href={launchUrl} target="_blank" rel="noreferrer">Explore</Button>
-            <a href={launchUrl} target="_blank" rel="noreferrer">
-              Explore
-            </a>
-          </Text>
-          <Button onClick={onRequestPermission}>
-            Give permission to access {url.host}
-          </Button>
-        </div>
-      );
-    }
 
     return (
-      <SalesforceContext.Provider value={{ domain: url?.host, onSessionExpired: () => {} }}>
+      <SalesforceSession domain={url.host}>
         <Text size="xs">
           SALESFORCE DOMAIN: {url?.host}{' '}
           <Button component="a" href={launchUrl} target="_blank" rel="noreferrer">Explore</Button>
           <p>
             {identityResults?.display_name} ({identityResults?.email})
           </p>
-          {hasPermission && cookie && <LoggedIntoSalesforce cookie={cookie} />}
+          <LoggedIntoSalesforce />
         </Text>
-      </SalesforceContext.Provider>
+      </SalesforceSession>
     );
   }
 
-  if (salesforceTabDomains.size > 0) {
-
-  }
-
   return (
-    <div>
-      Open a Salesforce tab to explore the org.
-    </div>
+    <Paper shadow="xs" p="md">
+      <Text>
+        Open a Salesforce tab to explore the org.
+      </Text>
+      <Button component="a" href="https://login.salesforce.com" target="_blank" rel="noreferrer">Log back in</Button>
+    </Paper>
   );
 };
 

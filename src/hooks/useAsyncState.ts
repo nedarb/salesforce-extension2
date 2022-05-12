@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 
-export default function useAsyncState<T>(generator: ()=>Promise<T>) {
+export default function useAsyncState<T>(generator: ()=>Promise<T>): [T | undefined, boolean] {
   const [value, setValue] = useState<T | undefined>(undefined);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    generator().then(setValue);
+    setIsLoading(true);
+    generator().then(setValue).finally(() => setIsLoading(false));
   }, [generator]);
 
-  return value;
+  return [value, isLoading];
 }

@@ -3,25 +3,29 @@ import React, {
   ChangeEventHandler,
   FormEventHandler,
   useCallback,
+  useContext,
   useEffect,
   useMemo,
   useState,
 } from 'react';
 import browser from 'webextension-polyfill';
-import { Paper, Tabs, Button, Text } from '@mantine/core';
+import {
+  Paper, Tabs, Button, Text,
+} from '@mantine/core';
 import normalizeSalesforceDomain from '../common/SalesforceUtils';
 import useBrowserCookie from '../hooks/useBrowserCookie';
-import useBrowserPermission from '../hooks/useBrowserPermission';
 import useDebounce from '../hooks/useDebounce';
 import useHash from '../hooks/useHash';
 import ApiResults from './ApiResults';
-import SalesforceContext from '../contexts/SalesforceContext';
 import Query from './Query';
 import useLocalStorage from '../hooks/useLocalStorage';
+import SalesforceSession from '../components/SalesforceSession';
+import SalesforceContext from '../contexts/SalesforceContext';
 
 const url = new URL(window.location.href);
 
-function LoggedIntoSalesforce({ cookie }: { cookie: browser.Cookies.Cookie }) {
+function LoggedIntoSalesforce() {
+  const { cookie } = useContext(SalesforceContext);
   const [activeTab, setActiveTab] = useLocalStorage<number>('activeTab');
   const defaultUrl = new URLSearchParams(window.location.hash.substring(1)).get(
     'url',
@@ -67,17 +71,17 @@ function LoggedIntoSalesforce({ cookie }: { cookie: browser.Cookies.Cookie }) {
   );
 
   return (
-    <Tabs className='tabs' active={activeTab} onTabChange={setActiveTab}>
+    <Tabs className="tabs" active={activeTab} onTabChange={setActiveTab}>
       <Tabs.Tab label={cookie.domain}>
         <div>
           Logged in to{' '}
-          <a href={`https://${cookie.domain}`} target='_blank'>
+          <a href={`https://${cookie.domain}`} target="_blank">
             {cookie.domain}
           </a>
           <form onSubmit={handleSubmit}>
             <input
-              type='text'
-              name='path'
+              type="text"
+              name="path"
               value={path}
               onChange={handleChange}
             />
@@ -89,7 +93,7 @@ function LoggedIntoSalesforce({ cookie }: { cookie: browser.Cookies.Cookie }) {
           </form>
         </div>
       </Tabs.Tab>
-      <Tabs.Tab label='Query'>
+      <Tabs.Tab label="Query">
         <Query cookie={cookie} />
       </Tabs.Tab>
     </Tabs>
@@ -100,60 +104,20 @@ const App = () => {
   const domain = normalizeSalesforceDomain(
     url.searchParams.get('domain') ?? undefined,
   );
-  const [hasPermission, onRequestPermission, onRemovePermission] =
-    useBrowserPermission(domain);
-  const [sessionExpired, setSessionExpired] = useState(false);
-
-  const cookie = useBrowserCookie({
-    url: hasPermission ? domain : undefined,
-    name: 'sid',
-  });
-
-  const onSessionExpired = useCallback(
-    (possibleError?: any) => {
-      setSessionExpired(true);
-      console.log('session expired', possibleError);
-    },
-    [domain],
-  );
 
   if (!domain) {
     return (
-      <div>
-        ERROR! Please{' '}
-        <a href='https://login.salesforce.com'>log into Salesforce</a>
-      </div>
-    );
-  }
-
-  if (sessionExpired) {
-    return (
-      <div className='error'>
-        No valid session for{' '}
-        <a href={domain} target='_blank'>
-          {domain}
-        </a>
-      </div>
-    );
-  }
-
-  if (!hasPermission) {
-    return (
-      <Paper shadow='xs' p='md'>
-        <Text>No permission for {domain}</Text>
-        <Button onClick={onRequestPermission}>Request</Button>
+      <Paper shadow="xs" p="md">
+        <Text>Please log into a Salesforce org!</Text>
+        <Button component="a" href="https://login.salesforce.com" target="_blank" rel="noreferrer">Log in</Button>
       </Paper>
     );
   }
 
-  if (!cookie) {
-    return <div className='error'>No cookie for {domain}</div>;
-  }
-
   return (
-    <SalesforceContext.Provider value={{ domain, onSessionExpired }}>
-      <LoggedIntoSalesforce cookie={cookie} />
-    </SalesforceContext.Provider>
+    <SalesforceSession domain={domain}>
+      <LoggedIntoSalesforce />
+    </SalesforceSession>
   );
 };
 
