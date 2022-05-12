@@ -7,10 +7,11 @@ export interface Params {
 }
 
 export default function useBrowserCookie({ url, name }: Params): [browser.Cookies.Cookie | undefined, boolean] {
+  const [lastUrl, setLastUrl] = useState<string | undefined>(undefined);
   const [cookie, setCookie] = useState<browser.Cookies.Cookie | undefined>(
     undefined,
   );
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(!!url);
   useEffect(() => {
     if (url) {
       setIsLoading(true);
@@ -18,7 +19,10 @@ export default function useBrowserCookie({ url, name }: Params): [browser.Cookie
         setCookie(result);
       }).finally(() => setIsLoading(false));
     }
+    setLastUrl(url);
   }, [url, name]);
 
-  return [cookie, isLoading];
+  const isActuallyLoading = isLoading || lastUrl !== url;
+
+  return [cookie, isActuallyLoading];
 }
