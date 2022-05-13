@@ -50,7 +50,7 @@ export default function Query({ cookie }: { cookie: browser.Cookies.Cookie }) {
     <form onSubmit={handleSubmit}>
       <Grid>
         <Grid.Col span={9}>
-          <TextInput type="text" name="query" value={query} />
+          <TextInput type="text" name="query" defaultValue={query} />
         </Grid.Col>
         <Grid.Col span={3}>
           <Switch label="Show as table" checked={showAsTable} onChange={handleToggleChange} />

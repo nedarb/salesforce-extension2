@@ -1,3 +1,4 @@
+/* eslint-disable react/require-default-props */
 import { Button, Paper, Text } from '@mantine/core';
 import React, { ReactNode, useCallback, useState } from 'react';
 
@@ -9,8 +10,9 @@ import useBrowserPermission from '../hooks/useBrowserPermission';
 interface Props {
     domain: string;
     children: ReactNode;
+    noTokenBody?: ReactNode;
 }
-export default function SalesforceSession ({ domain: simpleDomain, children } : Props) {
+export default function SalesforceSession ({ domain: simpleDomain, children, noTokenBody } : Props) {
   const domain = urlToSalesforceMyDomain(simpleDomain);
   const [hasPermission, onRequestPermission, onRemovePermission] =
       useBrowserPermission(domain);
@@ -34,6 +36,7 @@ export default function SalesforceSession ({ domain: simpleDomain, children } : 
       <Paper shadow="xs" p="md">
         <Text>Please log into a Salesforce org!</Text>
         <Button component="a" href="https://login.salesforce.com" target="_blank" rel="noreferrer">Log in</Button>
+        {noTokenBody}
       </Paper>
     );
   }
@@ -43,6 +46,7 @@ export default function SalesforceSession ({ domain: simpleDomain, children } : 
       <Paper shadow="xs" p="md">
         <Text>Session has expired for {simpleDomain}</Text>
         <Button component="a" href={domain} target="_blank" rel="noreferrer">Log back in</Button>
+        {noTokenBody}
       </Paper>
     );
   }
@@ -53,6 +57,7 @@ export default function SalesforceSession ({ domain: simpleDomain, children } : 
       <Paper shadow="xs" p="md">
         <Text>No permission for {domain}</Text>
         <Button onClick={onRequestPermission}>Request</Button>
+        {noTokenBody}
       </Paper>
     );
   }
@@ -62,6 +67,7 @@ export default function SalesforceSession ({ domain: simpleDomain, children } : 
       <Paper shadow="xs" p="md">
         <Text>No cookie present for {simpleDomain}</Text>
         <Button component="a" href={domain} target="_blank" rel="noreferrer">Log back in</Button>
+        {noTokenBody}
       </Paper>
     );
   }

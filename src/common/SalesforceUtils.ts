@@ -1,7 +1,7 @@
 export const SalesforceDomains = ['.lightning.force.com', '.my.salesforce.com'];
 
 export default function urlToSalesforceMyDomain(
-  url?: string,
+  url?: string | null,
 ): string | undefined {
   if (url && url.indexOf('://') < 0) {
     return urlToSalesforceMyDomain(`https://${url}`);

@@ -101,6 +101,7 @@ function getSalesforceTabs() {
 }
 
 const App = () => {
+  const windowUrl = new URL(window.location.href);
   const [salesforceTabs, isSalesforceTabsLoading] = useAsyncState(getSalesforceTabs);
   const salesforceTabDomains: Set<string | undefined> = new Set(salesforceTabs?.map((t) => t.url)
     .map((url) => (url ? new URL(url) : null))
@@ -108,7 +109,7 @@ const App = () => {
     .map((url) => url?.host));
   const [specificCookie, setSpecificCookie] = useState<browser.Cookies.Cookie | undefined>();
   const [currentTab, isCurrentTabLoading] = useCurrentTab('https://*.lightning.force.com/*');
-  const currentTabUrl = [specificCookie?.domain ? `https://${specificCookie.domain}` : undefined, currentTab?.url, ...salesforceTabs?.map((t) => t.url).filter(Boolean) || []].filter(Boolean)[0];
+  const currentTabUrl = [urlToSalesforceMyDomain(windowUrl.searchParams.get('domain')) ?? undefined, specificCookie?.domain ? `https://${specificCookie.domain}` : undefined, currentTab?.url, ...salesforceTabs?.map((t) => t.url).filter(Boolean) || []].filter(Boolean)[0];
 
   const [cookie, isCookieLoading] = useBrowserCookie({
     url: urlToSalesforceMyDomain(currentTabUrl),
