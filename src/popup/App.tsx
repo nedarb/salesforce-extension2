@@ -1,4 +1,5 @@
 import React, {
+  FormEventHandler,
   useCallback, useContext, useEffect, useState,
 } from 'react';
 import browser from 'webextension-polyfill';
@@ -52,7 +53,7 @@ function RenderCell({ name, value, href }: { name: string; value: any; href?: st
 function LoggedIntoSalesforce() {
   const { cookie } = useContext(SalesforceContext);
   const [query, setQuery] = useLocalStorage(`popup_query:${cookie.domain}`, 'SELECT Id, Name, IsActive FROM User LIMIT 10');
-  const [debounced] = useDebounce(query);
+  const [debounced] = useDebounce(query, 2000);
   const {
     results: queryExplainResults,
     error: queryExplainError,
