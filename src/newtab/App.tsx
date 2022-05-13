@@ -51,7 +51,7 @@ function LoggedIntoSalesforce() {
   }, [debounced]);
 
   const handleChange: ChangeEventHandler<HTMLInputElement> = (e) =>
-    setPath(e.target.value.trim());
+    setPath(e.target.value);
   const handleSubmit: FormEventHandler<HTMLFormElement> = (e) => {
     e.preventDefault();
     const updatedPath =
