@@ -62,7 +62,7 @@ function LoggedIntoSalesforce() {
     cookie,
   });
 
-  const { results: queryResults } = useSalesforceQuery<{
+  const { results: queryResults, isLoading: isQueryLoading } = useSalesforceQuery<{
     done: boolean;
     totalSize: number;
     records: Array<any>;
@@ -76,22 +76,23 @@ function LoggedIntoSalesforce() {
 
   return (
     <form>
-      <LoadingOverlay visible={isLoading} />
+      <LoadingOverlay visible={isLoading || isQueryLoading} />
       <Textarea
         autosize
         value={query}
         onChange={handleChange}
         disabled={isLoading}
       />
-      <p>
-        {queryExplainError &&
-            queryExplainError.map((e) => (
+      {queryExplainError && (
+        <Text color="red">
+            {queryExplainError.map((e) => (
               <div key={e.errorCode}>
                 {e.errorCode}: {e.message}
               </div>
             ))}
-      </p>
-      {queryResults && <QueryResultsTable queryResults={queryResults} cookie={cookie} />}
+        </Text>
+      )}
+      {queryResults && !queryExplainError && <QueryResultsTable queryResults={queryResults} cookie={cookie} />}
     </form>
   );
 }
