@@ -58,9 +58,10 @@ export interface Props {
   showAsTable?: boolean;
   cookie: browser.Cookies.Cookie;
   onUpdateUrl?: (updated: string) => void;
+  onSuccessfulQuery?: (url: string)=>void;
 }
 export default function ApiResults({
-  url, cookie, onUpdateUrl, showAsTable,
+  url, cookie, onUpdateUrl, showAsTable, onSuccessfulQuery,
 }: Props) {
   const { results, isLoading, error } = useSalesforceApi({
     url,
@@ -72,7 +73,7 @@ export default function ApiResults({
   }, [onUpdateUrl]);
 
   useEffect(() => {
-    console.log(results);
+    if (onSuccessfulQuery && results) onSuccessfulQuery(url);
   }, [results]);
 
   if (error) {

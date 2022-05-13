@@ -12,7 +12,33 @@ interface Props {
       }
 }
 
-function RenderCell({ name, value, href }: { name: string; value: any; href?: string }) {
+function RenderObject({ label, value, domain }: {label?: string; value: any; domain: string}) {
+  if (value === null || value === undefined) { return null; }
+  const type = typeof value;
+  if (type === 'string') {
+    return <span>{label} {value}</span>;
+  }
+
+  const keys = Object.keys(value).filter((key) => key !== 'attributes');
+
+  if (keys.includes('Id') && keys.includes('Name')) {
+    const url = `https://${domain}/${value.Id}`;
+    const link = <a href={url} target="_blank" rel="noreferrer">{value.Name}</a>;
+    return (
+      <>{label ? `${label}:` : null} {link}<br />
+        {keys.filter((key) => key !== 'Id' && key !== 'Name').map((key) => {
+          const v = value[key];
+          return <RenderObject key={key} label={key} value={v} domain={domain} />;
+        })}
+      </>
+    );
+  }
+  return <span>obj: {keys.length === 1 ? value[keys[0] || ''] : keys.map((key) => `${key}: ${value[key]}`).join(', ')}</span>;
+}
+
+function RenderCell({
+  name, value, domain, href,
+}: { name: string; value: any; domain: string; href?: string }) {
   if (typeof value === 'boolean') {
     return <td>{value ? '✔️' : '☐'}</td>;
   }
@@ -20,8 +46,7 @@ function RenderCell({ name, value, href }: { name: string; value: any; href?: st
     return <td>-</td>;
   }
   if (typeof value === 'object') {
-    const keys = Object.keys(value).filter((key) => key !== 'attributes');
-    return <td>{keys.length === 1 ? value[keys[0] || ''] : keys.map((key) => `${key}: ${value[key]}`).join(', ')}</td>;
+    return <td><RenderObject value={value} domain={domain} /></td>;
   }
   if (href && name === 'Name') {
     return (
@@ -61,7 +86,7 @@ export default function QueryResultsTable({ queryResults, cookie }: Props) {
             <tr key={unique}>
               <td>{index + 1}</td>
               {headerKeys.map((key) => (
-                <RenderCell key={key} name={key} value={row[key]} href={href} />
+                <RenderCell key={key} name={key} value={row[key]} href={href} domain={cookie.domain} />
               ))}
               {hasId && !hasName && <td><a href={href} target="_blank">🌐</a></td>}
             </tr>

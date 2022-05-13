@@ -1,100 +1,34 @@
 import React, {
-  FormEventHandler,
   useCallback, useContext, useEffect, useState,
 } from 'react';
 import browser from 'webextension-polyfill';
 import {
-  Textarea, LoadingOverlay, Button, Text, Table, Paper,
+  Button, Text, Paper,
 } from '@mantine/core';
 import useCurrentTab from '../hooks/useCurrentTab';
-import useBrowserPermission from '../hooks/useBrowserPermission';
 import useBrowserCookie from '../hooks/useBrowserCookie';
-import useSalesforceQuery, {
+import {
   useSalesforceApi,
-  useSalesforceQueryExplain,
 } from '../hooks/useSalesforceQuery';
-import useDebounce from '../hooks/useDebounce';
 import urlToSalesforceMyDomain, {
   SalesforceDomains,
 } from '../common/SalesforceUtils';
 import SalesforceContext from '../contexts/SalesforceContext';
-import useLocalStorage from '../hooks/useLocalStorage';
 import useAsyncState from '../hooks/useAsyncState';
-import QueryResultsTable from '../components/QueryResultsTable';
 import SalesforceSession from '../components/SalesforceSession';
 import CookieChooser from '../components/CookieChooser';
+import Query from '../newtab/Query';
 
 interface SalesforceApiIdentity {
   display_name: string;
   email: string;
 }
 
-function RenderCell({ name, value, href }: { name: string; value: any; href?: string }) {
-  if (typeof value === 'boolean') {
-    return <td>{value ? '✔️' : '☐'}</td>;
-  }
-  if (value == null) {
-    return <td>-</td>;
-  }
-  if (typeof value === 'object') {
-    const keys = Object.keys(value).filter((key) => key !== 'attributes');
-    return <td>{keys.length === 1 ? value[keys[0] || ''] : keys.map((key) => `${key}: ${value[key]}`).join(', ')}</td>;
-  }
-  if (href && name === 'Name') {
-    return (
-      <td>
-        <a href={href} target="_blank">{value}</a>
-      </td>
-    );
-  }
-  return <td>{value}</td>;
-}
-
 function LoggedIntoSalesforce() {
   const { cookie } = useContext(SalesforceContext);
-  const [query, setQuery] = useLocalStorage(`popup_query:${cookie.domain}`, 'SELECT Id, Name, IsActive FROM User LIMIT 10');
-  const [debounced] = useDebounce(query, 2000);
-  const {
-    results: queryExplainResults,
-    error: queryExplainError,
-    isLoading,
-  } = useSalesforceQueryExplain<{ sourceQuery: string }>({
-    query: debounced,
-    cookie,
-  });
-
-  const { results: queryResults, isLoading: isQueryLoading } = useSalesforceQuery<{
-    done: boolean;
-    totalSize: number;
-    records: Array<any>;
-  }>({ query: queryExplainResults?.sourceQuery, cookie });
-
-  useEffect(() => {
-    console.log(queryExplainResults, queryExplainError);
-  }, [queryExplainResults, queryExplainError]);
-
-  const handleChange = (e) => setQuery(e.target.value.trim());
 
   return (
-    <form>
-      <LoadingOverlay visible={isLoading || isQueryLoading} />
-      <Textarea
-        autosize
-        value={query}
-        onChange={handleChange}
-        disabled={isLoading}
-      />
-      {queryExplainError && (
-        <Text color="red">
-            {queryExplainError.map((e) => (
-              <div key={e.errorCode}>
-                {e.errorCode}: {e.message}
-              </div>
-            ))}
-        </Text>
-      )}
-      {queryResults && !queryExplainError && <QueryResultsTable queryResults={queryResults} cookie={cookie} />}
-    </form>
+    <Query cookie={cookie} />
   );
 }
 

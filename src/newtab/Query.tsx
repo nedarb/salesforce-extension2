@@ -1,5 +1,6 @@
 /* eslint-disable implicit-arrow-linebreak */
 import {
+  Autocomplete,
   Grid, Group, Switch, TextInput,
 } from '@mantine/core';
 import React, {
@@ -14,6 +15,7 @@ import useLocalStorage from '../hooks/useLocalStorage';
 import ApiResults from './ApiResults';
 
 export default function Query({ cookie }: { cookie: browser.Cookies.Cookie }) {
+  const [recentQueries, setRecentQueries] = useLocalStorage<Array<string>>(`recentQueries:${cookie.domain}`, []);
   const [showAsTable, setShowAsTable] = useLocalStorage(`query_result:show_as_table:${cookie.domain}`, false);
   const [query, setQuery] = useLocalStorage<string>(
     `currentQuery:${cookie.domain}`,
@@ -46,17 +48,39 @@ export default function Query({ cookie }: { cookie: browser.Cookies.Cookie }) {
     debounced ?? '',
   )}`;
 
+  const handleSuccessfulQuery = useCallback((urlUsed: string) => {
+    const u = new URL(urlUsed, `https://${cookie.domain}`);
+    const actualQuery = u.searchParams.get('q');
+
+    if (actualQuery) {
+      // save query in recently used queries
+      const newList = [...recentQueries || []];
+      newList.push(actualQuery);
+      setRecentQueries(newList);
+    }
+  }, [url, recentQueries]);
+
+  const queryOptions: Array<string> = [...new Set((recentQueries || []))];
+
   return (
     <form onSubmit={handleSubmit}>
       <Grid>
         <Grid.Col span={9}>
-          <TextInput type="text" name="query" defaultValue={query} />
+          <Autocomplete
+            name="query"
+            defaultValue={query}
+            placeholder="SELECT Id, Name FROM User"
+            label="Query"
+            required
+            data={queryOptions}
+            onItemSubmit={(item) => { setQuery(item.value); immediatelyUpdate(item.value); }}
+          />
         </Grid.Col>
         <Grid.Col span={3}>
           <Switch label="Show as table" checked={showAsTable} onChange={handleToggleChange} />
         </Grid.Col>
       </Grid>
-      <ApiResults url={url} cookie={cookie} onUpdateUrl={forcePathUpdate} showAsTable={showAsTable} />
+      <ApiResults url={url} cookie={cookie} onUpdateUrl={forcePathUpdate} showAsTable={showAsTable} onSuccessfulQuery={handleSuccessfulQuery} />
     </form>
   );
 }
