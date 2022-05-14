@@ -1,13 +1,14 @@
 /* eslint-disable react/require-default-props */
 import browser from 'webextension-polyfill';
-import { Loader, Select } from '@mantine/core';
+import { Select } from '@mantine/core';
 import React, { useCallback } from 'react';
 import useAsyncState from '../hooks/useAsyncState';
 import urlToSalesforceMyDomain from '../common/SalesforceUtils';
+import { byStringSelector } from '../common/sorters';
 
 async function getSalesforceSessionCookies() {
   const cookies = await browser.cookies.getAll({ name: 'sid' });
-  return cookies.filter((cookie) => cookie.domain.endsWith('.my.salesforce.com'));
+  return cookies.filter((cookie) => cookie.domain.endsWith('.my.salesforce.com')).sort(byStringSelector((cookie) => cookie.domain));
 }
 
 function ensureDomain(domainOrUrl?: string) : URL | undefined {

@@ -33,7 +33,7 @@ function RenderObject({ label, value, domain }: {label?: string; value: any; dom
       </>
     );
   }
-  return <span>obj: {keys.length === 1 ? value[keys[0] || ''] : keys.map((key) => `${key}: ${value[key]}`).join(', ')}</span>;
+  return <span>{keys.length === 1 ? value[keys[0] || ''] : keys.map((key) => `${key}: ${value[key]}`).join(', ')}</span>;
 }
 
 function RenderCell({
