@@ -14,6 +14,8 @@ import useDebounce from '../hooks/useDebounce';
 import useLocalStorage from '../hooks/useLocalStorage';
 import ApiResults from './ApiResults';
 
+const QueryFieldName = 'query';
+
 export default function Query({ cookie }: { cookie: browser.Cookies.Cookie }) {
   const [recentQueries, setRecentQueries] = useLocalStorage<Array<string>>(`recentQueries:${cookie.domain}`, []);
   const [showAsTable, setShowAsTable] = useLocalStorage(`query_result:show_as_table:${cookie.domain}`, false);
@@ -26,7 +28,7 @@ export default function Query({ cookie }: { cookie: browser.Cookies.Cookie }) {
   const handleSubmit: FormEventHandler<HTMLFormElement> = (e) => {
     e.preventDefault();
     const updatedQuery = e.currentTarget.querySelector(
-      'input[name="query"]',
+      `input[name="${QueryFieldName}"]`,
     )?.value;
     if (updatedQuery) {
       setQuery(updatedQuery);
@@ -54,7 +56,7 @@ export default function Query({ cookie }: { cookie: browser.Cookies.Cookie }) {
 
     if (actualQuery) {
       // save query in recently used queries
-      const newList = [...recentQueries || []];
+      const newList = [...new Set(recentQueries)];
       newList.push(actualQuery);
       setRecentQueries(newList);
     }
@@ -67,7 +69,7 @@ export default function Query({ cookie }: { cookie: browser.Cookies.Cookie }) {
       <Grid>
         <Grid.Col span={9}>
           <Autocomplete
-            name="query"
+            name={QueryFieldName}
             defaultValue={query}
             placeholder="SELECT Id, Name FROM User"
             label="Query"
