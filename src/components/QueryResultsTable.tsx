@@ -1,6 +1,6 @@
 /* eslint-disable react/require-default-props */
-import { Table } from '@mantine/core';
-import React from 'react';
+import { Table, List } from '@mantine/core';
+import React, { ReactNode } from 'react';
 import browser from 'webextension-polyfill';
 
 interface Props {
@@ -12,11 +12,36 @@ interface Props {
       }
 }
 
+function Labelize({ label, children }: {label?: string; children: ReactNode}) {
+  if (label) {
+    return <span className="field">{label}: {children}</span>;
+  }
+
+  return <>{children}</>;
+}
+
 function RenderObject({ label, value, domain }: {label?: string; value: any; domain: string}) {
   if (value === null || value === undefined) { return null; }
   const type = typeof value;
-  if (type === 'string') {
-    return <span>{label} {value}</span>;
+  console.log(label, type, value);
+  if (type === 'string' || type === 'number') {
+    if (label === 'Id') {
+      const url = `https://${domain}/${value}`;
+      return <Labelize label={label}><a href={url} target="_blank" rel="noreferrer">{value}</a></Labelize>;
+    }
+    return <Labelize label={label}>{value}</Labelize>;
+  }
+  if (type === 'boolean') {
+    return <Labelize label={label}>{value ? 'TRUE' : 'FALSE'}</Labelize>;
+  }
+  if (Array.isArray(value)) {
+    return (
+      <div className="array">{label} ({value.length}):
+        <List type="ordered" size="xs">
+          {value.map((obj, index) => <List.Item key={index.toString()}><RenderObject domain={domain} value={obj} /></List.Item>)}
+        </List>
+      </div>
+    );
   }
 
   const keys = Object.keys(value).filter((key) => key !== 'attributes');
@@ -25,15 +50,24 @@ function RenderObject({ label, value, domain }: {label?: string; value: any; dom
     const url = `https://${domain}/${value.Id}`;
     const link = <a href={url} target="_blank" rel="noreferrer">{value.Name}</a>;
     return (
-      <>{label ? `${label}:` : null} {link}<br />
+      <Labelize label={label}>
+        {link}<br />
         {keys.filter((key) => key !== 'Id' && key !== 'Name').map((key) => {
           const v = value[key];
           return <RenderObject key={key} label={key} value={v} domain={domain} />;
         })}
-      </>
+      </Labelize>
     );
   }
-  return <span>{keys.length === 1 ? value[keys[0] || ''] : keys.map((key) => `${key}: ${value[key]}`).join(', ')}</span>;
+
+  if (keys.length === 1 && keys[0]) {
+    return <span>{value[keys[0]]}</span>;
+  }
+  return (
+    <Labelize label={label}>
+      {keys.map((key) => <RenderObject key={key} label={key} value={value[key]} domain={domain} />)}
+    </Labelize>
+  );
 }
 
 function RenderCell({

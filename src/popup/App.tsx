@@ -18,6 +18,7 @@ import useAsyncState from '../hooks/useAsyncState';
 import SalesforceSession from '../components/SalesforceSession';
 import CookieChooser from '../components/CookieChooser';
 import Query from '../newtab/Query';
+import useLocalStorage from '../hooks/useLocalStorage';
 
 interface SalesforceApiIdentity {
   display_name: string;
@@ -38,6 +39,7 @@ function getSalesforceTabs() {
 
 const App = () => {
   const windowUrl = new URL(window.location.href);
+  const [lastDomainUsed, setLastDomainUsed] = useLocalStorage<string>('lastDomain');
   const [salesforceTabs, isSalesforceTabsLoading] = useAsyncState(getSalesforceTabs);
   const salesforceTabDomains: Set<string | undefined> = new Set(salesforceTabs?.map((t) => t.url)
     .map((url) => (url ? new URL(url) : null))
@@ -70,6 +72,7 @@ const App = () => {
     const url = new URL(window.location.href);
     url.searchParams.set('domain', c.domain);
     window.history.pushState({}, 'Title', url.toString());
+    setLastDomainUsed(c.domain);
     setSpecificCookie(c);
   }, []);
 
@@ -106,7 +109,7 @@ const App = () => {
         Open a Salesforce tab to explore the org.
         {specificCookie?.domain}
       </Text>
-      <CookieChooser onCookieChosen={handleCookieChosen} />
+      <CookieChooser defaultDomain={lastDomainUsed} onCookieChosen={handleCookieChosen} />
       <Button component="a" href="https://login.salesforce.com" target="_blank" rel="noreferrer">Log back in</Button>
     </Paper>
   );
