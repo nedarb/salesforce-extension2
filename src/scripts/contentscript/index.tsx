@@ -1,10 +1,29 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, {
+  useEffect, useMemo, useRef, useState,
+} from 'react';
 import ReactDOM from 'react-dom';
 import browser from 'webextension-polyfill';
 import {
-  Modal, Autocomplete, Loader, MultiSelect,
+  Modal, Autocomplete, Loader, MultiSelect, SelectItem,
 } from '@mantine/core';
 import { useSalesforceApi } from '../../hooks/useSalesforceQuery';
+
+interface SObjectDescribeResult {
+  fields:Array<{name: string;
+    label: string;
+    type: string;
+    updateable: boolean,
+    picklistValues?: Array<{active: boolean; label: string; value: string}>
+  }>;
+  childRelationships: Array<{
+    'cascadeDelete' : boolean;
+    'childSObject' : string;// "ADM_Acceptance_Criterion__c",
+    'deprecatedAndHidden' : boolean,
+    'field' : string, // "Work__c",
+    'relationshipName' : string; // "Acceptance_Criteria__r",
+    'restrictedDelete' : boolean
+  }>;
+}
 
 function extractSObjectName(url: URL) {
   const pathParts = url.pathname.split('/').filter(Boolean);
@@ -17,20 +36,67 @@ function extractSObjectName(url: URL) {
   return undefined;
 }
 
-const Actions = [{ value: 'update', label: 'Update' }, { value: 'delete', label: 'Delete' }];
+const UpdateAction: SelectItem = { value: 'update', label: 'Update' };
+const RelationshipsAction: SelectItem = { value: 'relationships', label: 'Relationships' };
+
+const Actions:Array<SelectItem> = [UpdateAction,
+  { value: 'delete', label: 'Delete' },
+  RelationshipsAction];
+
+function getOptions(selection: Array<string>, describeResult?: SObjectDescribeResult): Array<SelectItem> {
+  if (selection.length > 0) {
+    const [selectedAction, selectedSubAction] = selection;
+    switch (selectedAction) {
+      case UpdateAction.value:
+        if (!describeResult) {
+          return [UpdateAction];
+        }
+
+        if (selectedSubAction) {
+          // selectedSubAction is the selected field
+          const field = describeResult.fields.find((f) => f.name === selectedSubAction);
+          if (field) {
+            if (field.picklistValues) {
+              return [UpdateAction, { value: field.name, label: field.label }, ...field.picklistValues];
+            }
+
+            return [UpdateAction, { value: field.name, label: field.label }];
+          }
+          return [UpdateAction, { value: selectedSubAction, label: selectedSubAction }];
+        }
+        return [UpdateAction,
+          ...(describeResult ? describeResult.fields.filter((f) => f.updateable).map((field) => ({ value: field.name, label: field.label })) || [] : []),
+        ];
+      case RelationshipsAction.value:
+        if (!describeResult) {
+          return [UpdateAction];
+        }
+
+        if (selectedSubAction) {
+          // already selected a subaction
+          return [RelationshipsAction,
+            ...(describeResult.childRelationships.filter((r) => r.relationshipName === selectedSubAction).map((r) => ({ value: r.relationshipName, label: r.relationshipName })))];
+        }
+        return [RelationshipsAction,
+          ...(describeResult.childRelationships.filter((r) => r.relationshipName).map((r) => ({ value: r.relationshipName, label: r.relationshipName })))];
+      default:
+    }
+  }
+
+  return Actions;
+}
 
 function ToDisplay({ cookie, onClose }: {cookie: browser.Cookies.Cookie; onClose: ()=>void}) {
   const url = new URL(window.location.href);
   const sobjectName = extractSObjectName(url);
+  const [value2, setMultiSelect] = useState<Array<string>>([]);
   const apiUrl = sobjectName ? `/services/data/v50.0/sobjects/${sobjectName}/describe` : undefined;
-  const { results, isLoading } = useSalesforceApi<{fields:Array<{name: string;label: string; type: string}>}>({ url: apiUrl, cookie, useCache: true });
+  const { results, isLoading } = useSalesforceApi<SObjectDescribeResult>({ url: apiUrl, cookie, useCache: true });
 
   const timeoutRef = useRef<number>(-1);
   const [value, setValue] = useState('');
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<string[]>([]);
-
-  const [value2, setValue2] = useState<Array<string>>([]);
 
   const handleChange = (val: string) => {
     window.clearTimeout(timeoutRef.current);
@@ -48,9 +114,7 @@ function ToDisplay({ cookie, onClose }: {cookie: browser.Cookies.Cookie; onClose
     }
   };
 
-  const options: Array<{value: string; label: string}> = value2[0] === 'update' ? [Actions[0],
-    ...(results ? results.fields.map((field) => ({ value: field.name, label: field.label })) || [] : []),
-  ] : Actions;
+  const options: Array<SelectItem> = useMemo(() => getOptions(value2, results), [value2, results]);
 
   return (
     <Modal title="Salesforce actions" onClose={onClose} opened overflow="inside">
@@ -58,7 +122,7 @@ function ToDisplay({ cookie, onClose }: {cookie: browser.Cookies.Cookie; onClose
       <MultiSelect
         searchable
         value={value2}
-        onChange={setValue2}
+        onChange={setMultiSelect}
         data={options}
         label="Your favorite frameworks/libraries"
         placeholder="Pick all that you like"
