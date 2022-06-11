@@ -16,9 +16,74 @@ export interface Results<T> {
   isLoading: boolean;
 }
 
+export interface QueryResults<T> {
+  done: boolean;
+  totalSize: number;
+  records: Array<T>;
+}
+
+export function makeApiCall<T = any>({
+  url,
+  cookie,
+  useCache,
+}: { url: string } & BaseParams): Promise<T> {
+  if (!cookie) {
+    throw new Error('Must have a cookie!');
+  }
+
+  const controller = new AbortController();
+  const { signal } = controller;
+  const finalUrl = url.startsWith('https:')
+    ? url
+    : new URL(url, `https://${cookie.domain}`);
+
+  const cacheKey = `apiResult:${url.toString()}`;
+  if (useCache) {
+    const fromStorage = localStorage.getItem(cacheKey);
+    if (fromStorage) {
+      return JSON.parse(fromStorage);
+    }
+  }
+
+  return fetch(finalUrl.toString(), {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${cookie.value}` },
+    signal,
+  })
+    .then(async (result) => {
+      if (result.ok) {
+        return [await result.json()];
+      }
+      return [undefined, await result.json()];
+    })
+    .then(([result, err]) => {
+      if (err) {
+        if (Array.isArray(err) && err[0]?.errorCode === 'INVALID_SESSION_ID') {
+          return Promise.reject(err[0]);
+        }
+        return Promise.reject(err);
+      }
+
+      // cache results
+      if (useCache) {
+        localStorage.setItem(cacheKey, JSON.stringify(result));
+      }
+      return Promise.resolve(result);
+    });
+}
+
+export function makeQueryCall<T = any>({
+  query,
+  cookie,
+}: Required<Params>): Promise<QueryResults<T>> {
+  const url = new URL(`https://${cookie.domain}/services/data/v50.0/query`);
+  if (query) url?.searchParams.append('q', query);
+  return makeApiCall<QueryResults<T>>({ url: url.toString(), cookie });
+}
+
 export function useSalesforceApi<
   T = any,
-  TError = Array<{ errorCode: string; message: string }>
+  TError = Array<{ errorCode: string; message: string }>,
 >({
   url,
   cookie,

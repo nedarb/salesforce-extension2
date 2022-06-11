@@ -2,11 +2,13 @@ import React, {
   useEffect, useMemo, useRef, useState,
 } from 'react';
 import ReactDOM from 'react-dom';
-import browser from 'webextension-polyfill';
+import browser, { search } from 'webextension-polyfill';
 import {
   Modal, Autocomplete, Loader, MultiSelect, SelectItem,
 } from '@mantine/core';
-import { useSalesforceApi } from '../../hooks/useSalesforceQuery';
+import { makeQueryCall, useSalesforceApi } from '../../hooks/useSalesforceQuery';
+import useDebounce from '../../hooks/useDebounce';
+import useAsyncState, { useAsyncState2 } from '../../hooks/useAsyncState';
 
 interface SObjectDescribeResult {
   fields:Array<{name: string;
@@ -45,9 +47,35 @@ const Actions:Array<SelectItem> = [UpdateAction,
   { value: 'delete', label: 'Delete' },
   RelationshipsAction];
 
-function getOptions(selection: Array<string>, describeResult?: SObjectDescribeResult): Array<SelectItem> {
+class ActionCache {
+    private readonly cache: Record<string, SelectItem> = {};
+
+    public getFromValue(value: string): SelectItem | undefined {
+      if (value in this.cache) {
+        return this.cache[value];
+      }
+
+      return undefined;
+    }
+
+    public get(value: string, label: string): SelectItem {
+      if (!this.cache[value]) {
+        this.cache[value] = { value, label };
+      }
+      return this.cache[value]!;
+    }
+}
+
+const actionCache = new ActionCache();
+
+async function getOptions(
+  selection: Array<string>,
+  currentQuery: string,
+  describeResult?: SObjectDescribeResult,
+  cookie: browser.Cookies.Cookie,
+): Promise<Array<SelectItem>> {
   if (selection.length > 0) {
-    const [selectedAction, selectedSubAction] = selection;
+    const [selectedAction, selectedSubAction, selectedSubActionValue] = selection;
     switch (selectedAction) {
       case UpdateAction.value:
         if (!describeResult) {
@@ -58,8 +86,18 @@ function getOptions(selection: Array<string>, describeResult?: SObjectDescribeRe
           // selectedSubAction is the selected field
           const field = describeResult.fields.find((f) => f.name === selectedSubAction);
           if (field) {
-            if (field.picklistValues) {
+            if (field.picklistValues?.length) {
               return [UpdateAction, { value: field.name, label: field.label }, ...field.picklistValues];
+            }
+
+            const referenceTo = field.referenceTo?.length === 1 ? field.referenceTo[0] : null;
+            if (referenceTo && currentQuery.length > 0) {
+              // query reference to
+              console.log('Going to search referenceTo', field.referenceTo);
+              const results = await makeQueryCall<{ Id: string; Name: string;}>({ query: `select Id, Name from ${referenceTo} where name like '%${currentQuery}%' limit 10`, cookie, useCache: true });
+              console.log('results', results);
+              return [UpdateAction, { value: field.name, label: field.label },
+                ...results.records.map((r) => actionCache.get(r.Id, r.Name))];
             }
 
             return [UpdateAction, { value: field.name, label: field.label }];
@@ -67,7 +105,7 @@ function getOptions(selection: Array<string>, describeResult?: SObjectDescribeRe
           return [UpdateAction, { value: selectedSubAction, label: selectedSubAction }];
         }
         return [UpdateAction,
-          ...(describeResult ? describeResult.fields.filter((f) => f.updateable).map((field) => ({ value: field.name, label: field.label })) || [] : []),
+          ...(describeResult.fields.filter((f) => f.updateable).map((field) => ({ value: field.name, label: field.label }))),
         ];
       case RelationshipsAction.value:
         if (!describeResult) {
@@ -94,8 +132,12 @@ function ToDisplay({ cookie, onClose }: {cookie: browser.Cookies.Cookie; onClose
   const [value2, setMultiSelect] = useState<Array<string>>([]);
   const apiUrl = sobjectName ? `/services/data/v50.0/sobjects/${sobjectName}/describe` : undefined;
   const { results, isLoading } = useSalesforceApi<SObjectDescribeResult>({ url: apiUrl, cookie, useCache: false });
+  const [query, setQuery] = useState('');
+  const [debouncedQuery, immediatelySetDebouncedQuery] = useDebounce(query, 500);
 
-  const options: Array<SelectItem> = useMemo(() => getOptions(value2, results), [value2, results]);
+  const [options, optionsLoading] = useAsyncState2(getOptions, value2, debouncedQuery, results, cookie);
+
+  // const options: Array<SelectItem> = useMemo(() => getOptions(value2, debouncedQuery, results), [value2, results, debouncedQuery]);
 
   return (
     <Modal title="Salesforce actions" onClose={onClose} opened overflow="inside">
@@ -104,11 +146,15 @@ function ToDisplay({ cookie, onClose }: {cookie: browser.Cookies.Cookie; onClose
         searchable
         data-autofocus
         value={value2}
-        onChange={setMultiSelect}
-        data={options}
+        onChange={(updated) => {
+          setMultiSelect(updated);
+          immediatelySetDebouncedQuery('');
+        }}
+        onSearchChange={setQuery}
+        data={options || []}
         label="Your favorite frameworks/libraries"
         placeholder="Pick all that you like"
-        rightSection={isLoading ? <Loader size={16} /> : null}
+        rightSection={isLoading || optionsLoading ? <Loader size={16} /> : null}
       />
       {JSON.stringify(results)}
     </Modal>
