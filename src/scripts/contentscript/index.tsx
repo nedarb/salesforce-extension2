@@ -1,14 +1,19 @@
+/* eslint-disable no-restricted-syntax */
 import React, {
   useEffect, useMemo, useRef, useState,
+  useCallback,
 } from 'react';
 import ReactDOM from 'react-dom';
 import browser, { search } from 'webextension-polyfill';
 import {
   Modal, Autocomplete, Loader, MultiSelect, SelectItem,
 } from '@mantine/core';
+import { NotificationsProvider, showNotification } from '@mantine/notifications';
+
 import { makeQueryCall, useSalesforceApi } from '../../hooks/useSalesforceQuery';
 import useDebounce from '../../hooks/useDebounce';
 import useAsyncState, { useAsyncState2 } from '../../hooks/useAsyncState';
+import useLocation from '../../hooks/useLocation';
 
 interface SObjectDescribeResult {
   fields:Array<{name: string;
@@ -29,15 +34,15 @@ interface SObjectDescribeResult {
   }>;
 }
 
-function extractSObjectName(url: URL) {
+function extractSObjectName(url: URL): { sobjectName?: string; recordId?: string; } {
   const pathParts = url.pathname.split('/').filter(Boolean);
   if (pathParts[0] === 'lightning') {
     if (pathParts[1] === 'r') {
-      return pathParts[2];
+      return { sobjectName: pathParts[2], recordId: pathParts[3] };
     }
   }
 
-  return undefined;
+  return {};
 }
 
 const UpdateAction: SelectItem = { value: 'update', label: 'Update' };
@@ -91,10 +96,12 @@ async function getOptions(
             }
 
             const referenceTo = field.referenceTo?.length === 1 ? field.referenceTo[0] : null;
-            if (referenceTo && currentQuery.length > 0) {
+            if (referenceTo) {
               // query reference to
               console.log('Going to search referenceTo', field.referenceTo);
-              const results = await makeQueryCall<{ Id: string; Name: string;}>({ query: `select Id, Name from ${referenceTo} where name like '%${currentQuery}%' limit 10`, cookie, useCache: true });
+              const query = currentQuery.length > 0 ? `select Id, Name from ${referenceTo} where name like '%${currentQuery}%' limit 10` :
+                `SELECT Id, Name FROM RecentlyViewed WHERE Type='${referenceTo}' ORDER BY LastViewedDate DESC`;
+              const results = await makeQueryCall<{ Id: string; Name: string;}>({ query, cookie, useCache: true });
               console.log('results', results);
               return [UpdateAction, { value: field.name, label: field.label },
                 ...results.records.map((r) => actionCache.get(r.Id, r.Name))];
@@ -126,9 +133,23 @@ async function getOptions(
   return Actions;
 }
 
+interface ActionExecutor {
+  canExecute: (selection: Array<string>)=>boolean;
+  execute: (recordId: string, selection: Array<string>) => Promise<string>;
+}
+
+const actionExecutors: Array<ActionExecutor> = [{
+  canExecute: (selection: Array<string>) => selection[0] === 'update' && selection.length === 3,
+  execute: (recordId, [, fieldName, updatedValue]) => {
+    showNotification({ title: 'Updated', message: `Updating ${fieldName} to ${updatedValue}` });
+    return Promise.resolve(`foobar ${recordId} ${fieldName}=${updatedValue}`);
+  },
+}];
+
 function ToDisplay({ cookie, onClose }: {cookie: browser.Cookies.Cookie; onClose: ()=>void}) {
-  const url = new URL(window.location.href);
-  const sobjectName = extractSObjectName(url);
+  const windowLocation = useLocation();
+  const url = new URL(windowLocation.href);
+  const { sobjectName, recordId } = extractSObjectName(url);
   const [value2, setMultiSelect] = useState<Array<string>>([]);
   const apiUrl = sobjectName ? `/services/data/v50.0/sobjects/${sobjectName}/describe` : undefined;
   const { results, isLoading } = useSalesforceApi<SObjectDescribeResult>({ url: apiUrl, cookie, useCache: false });
@@ -138,6 +159,19 @@ function ToDisplay({ cookie, onClose }: {cookie: browser.Cookies.Cookie; onClose
   const [options, optionsLoading] = useAsyncState2(getOptions, value2, debouncedQuery, results, cookie);
 
   // const options: Array<SelectItem> = useMemo(() => getOptions(value2, debouncedQuery, results), [value2, results, debouncedQuery]);
+  const handleChange = useCallback((updatedValue: Array<string>) => {
+    setMultiSelect(updatedValue);
+    if (recordId) {
+      for (const executor of actionExecutors) {
+        if (executor.canExecute(updatedValue)) {
+          console.debug('Executing', executor, updatedValue);
+          executor.execute(recordId, updatedValue).then(console.info);
+          return;
+        }
+      }
+    }
+    immediatelySetDebouncedQuery('');
+  }, [recordId]);
 
   return (
     <Modal title="Salesforce actions" onClose={onClose} opened overflow="inside">
@@ -146,10 +180,7 @@ function ToDisplay({ cookie, onClose }: {cookie: browser.Cookies.Cookie; onClose
         searchable
         data-autofocus
         value={value2}
-        onChange={(updated) => {
-          setMultiSelect(updated);
-          immediatelySetDebouncedQuery('');
-        }}
+        onChange={handleChange}
         onSearchChange={setQuery}
         data={options || []}
         label="Your favorite frameworks/libraries"
@@ -190,7 +221,9 @@ document.body.appendChild(el);
 
 ReactDOM.render(
   <React.StrictMode>
-    <App />
+    <NotificationsProvider>
+      <App />
+    </NotificationsProvider>
   </React.StrictMode>,
   el,
 );

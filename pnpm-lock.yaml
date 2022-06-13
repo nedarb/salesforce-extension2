@@ -7,6 +7,7 @@ specifiers:
   '@babel/preset-typescript': ^7.12.16
   '@mantine/core': ^4.2.2
   '@mantine/hooks': ^4.2.2
+  '@mantine/notifications': ^4.2.8
   '@pmmmwh/react-refresh-webpack-plugin': ^0.4.3
   '@types/react': ^17.0.1
   '@types/react-dom': ^17.0.0
@@ -50,6 +51,7 @@ specifiers:
 dependencies:
   '@mantine/core': 4.2.2_68bcfc9d0d7620c3c931dd11ec49260f
   '@mantine/hooks': 4.2.2_react@17.0.2
+  '@mantine/notifications': 4.2.8_69762acb2ca940f5d644be075721ea51
   '@types/webextension-polyfill': 0.8.3
   preact: 10.6.6
   preact-compat: 3.19.0_preact@10.6.6
@@ -1505,6 +1507,21 @@ packages:
       react: '>=16.8.0'
     dependencies:
       react: 17.0.2
+    dev: false
+
+  /@mantine/notifications/4.2.8_69762acb2ca940f5d644be075721ea51:
+    resolution: {integrity: sha512-DXy6Crvt4DcWtadu8DTF6YaszLr2R7+TnWgVqnte2uOL6ZUEWfJafOqyk+Sr1QAbDnt3ez6bykz9ZzNLZca41Q==}
+    peerDependencies:
+      '@mantine/core': 4.2.8
+      '@mantine/hooks': 4.2.8
+      react: '>=16.8.0'
+      react-dom: '>=16.8.0'
+    dependencies:
+      '@mantine/core': 4.2.2_68bcfc9d0d7620c3c931dd11ec49260f
+      '@mantine/hooks': 4.2.2_react@17.0.2
+      react: 17.0.2
+      react-dom: 17.0.2_react@17.0.2
+      react-transition-group: 4.4.2_react-dom@17.0.2+react@17.0.2
     dev: false
 
   /@mantine/styles/4.2.2_957d919fdd69fb6b03348b882364a546:
@@ -3178,6 +3195,13 @@ packages:
     dependencies:
       utila: 0.4.0
     dev: true
+
+  /dom-helpers/5.2.1:
+    resolution: {integrity: sha512-nRCa7CK3VTrM2NmGkIy4cbK7IZlgBE/PYMn55rrXefr5xXDP0LdtfPnblFDoVdcAfslJ7or6iqAUnx0CCGIWQA==}
+    dependencies:
+      '@babel/runtime': 7.17.9
+      csstype: 3.0.10
+    dev: false
 
   /dom-serializer/1.3.2:
     resolution: {integrity: sha512-5c54Bk5Dw4qAxNOI1pFEizPSjVsx5+bpJKmL2kPn8JhBUq2q09tTCa3mjijun2NfK78NMouDYNMBkOrPZiS+ig==}
@@ -5845,6 +5869,20 @@ packages:
       use-latest: 1.2.1_a0c521d4794c7ad97f5f4c1c4a7d5818
     transitivePeerDependencies:
       - '@types/react'
+    dev: false
+
+  /react-transition-group/4.4.2_react-dom@17.0.2+react@17.0.2:
+    resolution: {integrity: sha512-/RNYfRAMlZwDSr6z4zNKV6xu53/e2BuaBbGhbyYIXTrmgu/bGHzmqOs7mJSJBHy9Ud+ApHx3QjrkKSp1pxvlFg==}
+    peerDependencies:
+      react: '>=16.6.0'
+      react-dom: '>=16.6.0'
+    dependencies:
+      '@babel/runtime': 7.17.9
+      dom-helpers: 5.2.1
+      loose-envify: 1.4.0
+      prop-types: 15.8.1
+      react: 17.0.2
+      react-dom: 17.0.2_react@17.0.2
     dev: false
 
   /react/17.0.2:
