@@ -12,6 +12,7 @@
     "dev": "webpack --env devBuild",
     "build": "webpack --env prod"
   },
+  "engines": {"node": ">=14.0 <15"},
   "devDependencies": {
     "@babel/core": "^7.12.13",
     "@babel/preset-env": "^7.12.13",
