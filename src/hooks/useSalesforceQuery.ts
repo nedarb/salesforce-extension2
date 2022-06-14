@@ -1,14 +1,23 @@
 /* eslint-disable no-restricted-syntax */
-import { useCallback, useContext, useEffect, useRef, useState } from 'react';
+import {
+  useCallback, useContext, useEffect, useRef, useState,
+} from 'react';
 import browser from 'webextension-polyfill';
+import { v4 as uuid } from 'uuid';
 import SalesforceContext from '../contexts/SalesforceContext';
 
-type HttpMethod = 'GET' | 'PATCH' | 'POST';
+/**
+ * SAMPLE API CALLS
+ *
+ * get search layout: /services/data/v50.0/search/layout/?q=User
+ * /services/data/v55.0/ui-api/object-info/Account
+ * /services/data/v55.0/ui-api/mru-list-records/Account
+ * /services/data/v55.0/ui-api/related-list-info/Account/Opportunities
+ *
+ * https://developer.salesforce.com/docs/atlas.en-us.238.0.uiapi.meta/uiapi/ui_api_resources_lookup_object_get.htm?q=search
+ */
 
-const uuid = () =>
-  '00000000-0000-4000-8000-000000000000'.replace(/0/g, function () {
-    return (0 | (Math.random() * 16)).toString(16);
-  });
+type HttpMethod = 'GET' | 'PATCH' | 'POST';
 
 interface BaseParams {
   cookie?: browser.Cookies.Cookie;
@@ -84,7 +93,7 @@ export function makeApiCall<T = any>({
     })
     .then(([result, err]) => {
       if (err) {
-        if (Array.isArray(err) && err[0]?.errorCode === 'INVALID_SESSION_ID') {
+        if (Array.isArray(err) && err.length === 1) {
           return Promise.reject(err[0]);
         }
         return Promise.reject(err);
@@ -253,9 +262,9 @@ export function useSalesforceApi<
           setIsLoading(false);
         });
       return () => controller.abort();
-    } else {
-      setResults(undefined);
     }
+    setResults(undefined);
+
     return () => {};
   }, [url, cookie]);
 

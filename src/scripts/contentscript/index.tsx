@@ -5,10 +5,11 @@ import React, {
 } from 'react';
 import ReactDOM from 'react-dom';
 import browser from 'webextension-polyfill';
+import { v4 as uuid } from 'uuid';
 import {
   Modal, Loader, MultiSelect, SelectItem,
 } from '@mantine/core';
-import { NotificationsProvider, showNotification } from '@mantine/notifications';
+import { NotificationsProvider, showNotification, updateNotification } from '@mantine/notifications';
 
 import {
   ApiCaller, QueryCaller, useSalesforceApi, useSalesforceApiCaller,
@@ -145,13 +146,49 @@ const actionExecutors: Array<ActionExecutor> = [{
   canExecute: (selection: Array<string>) => selection[0] === 'update' && selection.length === 3,
   execute: async (makeApiCall: ApiCaller, [, fieldName, updatedValue]) => {
     if (!fieldName) { return 'nothing updated'; }
-    showNotification({ title: 'Updated', message: `Updating ${fieldName} to ${updatedValue}` });
+    const id = uuid();
+    showNotification({
+      id,
+      loading: true,
+      title: 'Updating',
+      message: `Updating ${fieldName} to ${updatedValue}`,
+      autoClose: false,
+      disallowClose: true,
+    });
     const url = new URL(window.location.href);
     const { sobjectName, recordId } = extractSObjectName(url);
-    console.log('foobar 123', await makeApiCall(`/services/data/v50.0/sobjects/${sobjectName}/${recordId}`,
-      'PATCH',
-      { [fieldName]: updatedValue }));
-    return `foobar ${recordId} ${fieldName}=${updatedValue}`;
+    try {
+      const result = await makeApiCall(`/services/data/v50.0/sobjects/${sobjectName}/${recordId}`,
+        'PATCH',
+        { [fieldName]: updatedValue });
+      updateNotification({
+        id,
+        color: 'teal',
+        title: 'Updated',
+        message: `Updated ${fieldName} to ${updatedValue}`,
+        autoClose: 5000,
+      });
+      return `foobar ${recordId} ${fieldName}=${updatedValue}`;
+    } catch (e: any) {
+      console.warn('error executing', e);
+      if (e?.message) {
+        updateNotification({
+          id,
+          color: 'red',
+          title: 'Error updating',
+          message: e.message,
+          autoClose: 5000,
+        });
+      } else {
+        updateNotification({
+          id,
+          color: 'red',
+          title: 'Error updating',
+          message: JSON.stringify(e),
+          autoClose: 5000,
+        });
+      }
+    }
   },
 }];
 
@@ -174,7 +211,6 @@ function ToDisplay({ cookie, onClose }: {cookie: browser.Cookies.Cookie; onClose
     for (const executor of actionExecutors) {
       if (executor.canExecute(updatedValue)) {
         console.debug('Executing', executor, updatedValue, options);
-        showNotification({ title: 'Executing', message: 'Executing...' });
         executor.execute(makeApiCall, updatedValue).then(console.info);
         setMultiSelect([]);
         immediatelySetDebouncedQuery('');
