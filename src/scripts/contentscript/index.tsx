@@ -1,18 +1,20 @@
 /* eslint-disable no-restricted-syntax */
 import React, {
-  useEffect, useMemo, useRef, useState,
+  useEffect, useState,
   useCallback,
 } from 'react';
 import ReactDOM from 'react-dom';
-import browser, { search } from 'webextension-polyfill';
+import browser from 'webextension-polyfill';
 import {
-  Modal, Autocomplete, Loader, MultiSelect, SelectItem,
+  Modal, Loader, MultiSelect, SelectItem,
 } from '@mantine/core';
 import { NotificationsProvider, showNotification } from '@mantine/notifications';
 
-import { makeQueryCall, useSalesforceApi } from '../../hooks/useSalesforceQuery';
+import {
+  ApiCaller, QueryCaller, useSalesforceApi, useSalesforceApiCaller,
+} from '../../hooks/useSalesforceQuery';
 import useDebounce from '../../hooks/useDebounce';
-import useAsyncState, { useAsyncState2 } from '../../hooks/useAsyncState';
+import { useAsyncState2 } from '../../hooks/useAsyncState';
 import useLocation from '../../hooks/useLocation';
 
 interface SObjectDescribeResult {
@@ -74,6 +76,7 @@ class ActionCache {
 const actionCache = new ActionCache();
 
 async function getOptions(
+  makeApiQuery: QueryCaller,
   selection: Array<string>,
   currentQuery: string,
   describeResult?: SObjectDescribeResult,
@@ -101,7 +104,7 @@ async function getOptions(
               console.log('Going to search referenceTo', field.referenceTo);
               const query = currentQuery.length > 0 ? `select Id, Name from ${referenceTo} where name like '%${currentQuery}%' limit 10` :
                 `SELECT Id, Name FROM RecentlyViewed WHERE Type='${referenceTo}' ORDER BY LastViewedDate DESC`;
-              const results = await makeQueryCall<{ Id: string; Name: string;}>({ query, cookie, useCache: true });
+              const results = await makeApiQuery<{ Id: string; Name: string;}>(query);
               console.log('results', results);
               return [UpdateAction, { value: field.name, label: field.label },
                 ...results.records.map((r) => actionCache.get(r.Id, r.Name))];
@@ -135,14 +138,20 @@ async function getOptions(
 
 interface ActionExecutor {
   canExecute: (selection: Array<string>)=>boolean;
-  execute: (recordId: string, selection: Array<string>) => Promise<string>;
+  execute: (makeApiCall: ApiCaller, selection: Array<string>) => Promise<string>;
 }
 
 const actionExecutors: Array<ActionExecutor> = [{
   canExecute: (selection: Array<string>) => selection[0] === 'update' && selection.length === 3,
-  execute: (recordId, [, fieldName, updatedValue]) => {
+  execute: async (makeApiCall: ApiCaller, [, fieldName, updatedValue]) => {
+    if (!fieldName) { return 'nothing updated'; }
     showNotification({ title: 'Updated', message: `Updating ${fieldName} to ${updatedValue}` });
-    return Promise.resolve(`foobar ${recordId} ${fieldName}=${updatedValue}`);
+    const url = new URL(window.location.href);
+    const { sobjectName, recordId } = extractSObjectName(url);
+    console.log('foobar 123', await makeApiCall(`/services/data/v50.0/sobjects/${sobjectName}/${recordId}`,
+      'PATCH',
+      { [fieldName]: updatedValue }));
+    return `foobar ${recordId} ${fieldName}=${updatedValue}`;
   },
 }];
 
@@ -155,27 +164,29 @@ function ToDisplay({ cookie, onClose }: {cookie: browser.Cookies.Cookie; onClose
   const { results, isLoading } = useSalesforceApi<SObjectDescribeResult>({ url: apiUrl, cookie, useCache: false });
   const [query, setQuery] = useState('');
   const [debouncedQuery, immediatelySetDebouncedQuery] = useDebounce(query, 500);
+  const { makeApiCall, makeApiQuery } = useSalesforceApiCaller({ cookie });
 
-  const [options, optionsLoading] = useAsyncState2(getOptions, value2, debouncedQuery, results, cookie);
+  const [options, optionsLoading] = useAsyncState2(getOptions, makeApiQuery, value2, debouncedQuery, results, cookie);
 
   // const options: Array<SelectItem> = useMemo(() => getOptions(value2, debouncedQuery, results), [value2, results, debouncedQuery]);
   const handleChange = useCallback((updatedValue: Array<string>) => {
-    setMultiSelect(updatedValue);
-    if (recordId) {
-      for (const executor of actionExecutors) {
-        if (executor.canExecute(updatedValue)) {
-          console.debug('Executing', executor, updatedValue);
-          executor.execute(recordId, updatedValue).then(console.info);
-          return;
-        }
+    console.log('options:', options);
+    for (const executor of actionExecutors) {
+      if (executor.canExecute(updatedValue)) {
+        console.debug('Executing', executor, updatedValue, options);
+        showNotification({ title: 'Executing', message: 'Executing...' });
+        executor.execute(makeApiCall, updatedValue).then(console.info);
+        setMultiSelect([]);
+        immediatelySetDebouncedQuery('');
+        return;
       }
     }
+    setMultiSelect(updatedValue);
     immediatelySetDebouncedQuery('');
-  }, [recordId]);
+  }, [recordId, makeApiCall, options]);
 
   return (
     <Modal title="Salesforce actions" onClose={onClose} opened overflow="inside">
-      HELLO WORLD
       <MultiSelect
         searchable
         data-autofocus
