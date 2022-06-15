@@ -81,7 +81,6 @@ async function getOptions(
   selection: Array<string>,
   currentQuery: string,
   describeResult?: SObjectDescribeResult,
-  cookie: browser.Cookies.Cookie,
 ): Promise<Array<SelectItem>> {
   if (selection.length > 0) {
     const [selectedAction, selectedSubAction, selectedSubActionValue] = selection;
@@ -203,7 +202,7 @@ function ToDisplay({ cookie, onClose }: {cookie: browser.Cookies.Cookie; onClose
   const [debouncedQuery, immediatelySetDebouncedQuery] = useDebounce(query, 500);
   const { makeApiCall, makeApiQuery } = useSalesforceApiCaller({ cookie });
 
-  const [options, optionsLoading] = useAsyncState2(getOptions, makeApiQuery, value2, debouncedQuery, results, cookie);
+  const [options, optionsLoading] = useAsyncState2(getOptions, makeApiQuery, value2, debouncedQuery, results);
 
   // const options: Array<SelectItem> = useMemo(() => getOptions(value2, debouncedQuery, results), [value2, results, debouncedQuery]);
   const handleChange = useCallback((updatedValue: Array<string>) => {
