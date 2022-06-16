@@ -1,6 +1,6 @@
 /* eslint-disable no-restricted-syntax */
 import {
-  useCallback, useContext, useEffect, useRef, useState,
+  useCallback, useContext, useEffect, useMemo, useRef, useState,
 } from 'react';
 import browser from 'webextension-polyfill';
 import { v4 as uuid } from 'uuid';
@@ -13,6 +13,7 @@ import SalesforceContext from '../contexts/SalesforceContext';
  * /services/data/v55.0/ui-api/object-info/Account
  * /services/data/v55.0/ui-api/mru-list-records/Account
  * /services/data/v55.0/ui-api/related-list-info/Account/Opportunities
+ * /services/data/v55.0/ui-api/lookups/{objectApiName}/{fieldApiName}/{targetApiName}
  *
  * https://developer.salesforce.com/docs/atlas.en-us.238.0.uiapi.meta/uiapi/ui_api_resources_lookup_object_get.htm?q=search
  */
@@ -109,12 +110,21 @@ export function makeApiCall<T = any>({
   return { promise, controller };
 }
 
-export type ApiCaller<T = any> = (
+export type MakeApiCall<T = any> = (
   url: string,
   method?: HttpMethod,
   data?: any,
 ) => Promise<T>;
 export type QueryCaller<T = any> = (query: string) => Promise<T>;
+
+export interface ApiCaller {
+  makeApiCall: <T>(
+    url: string,
+    method?: HttpMethod,
+    data?: any,
+  ) => Promise<T>,
+  makeApiQuery: <T>(query: string) => Promise<QueryResults<T>>;
+}
 
 export function makeQueryCall<T = any>({
   query,
@@ -129,7 +139,7 @@ export function useSalesforceApiCaller({
   cookie,
 }: {
   cookie?: browser.Cookies.Cookie;
-}) {
+}): ApiCaller {
   const pendingCalls = useRef<Record<string, AbortablePromise>>({});
 
   const removePending = useCallback((id: string) => {
@@ -181,7 +191,9 @@ export function useSalesforceApiCaller({
     };
   }, [pendingCalls]);
 
-  return { makeApiCall: makeApiCall1, makeApiQuery };
+  const apiCaller: ApiCaller = useMemo(() => ({ makeApiCall: makeApiCall1, makeApiQuery }), [makeApiCall1, makeApiQuery]);
+
+  return apiCaller;
 }
 
 export function useSalesforceApi<

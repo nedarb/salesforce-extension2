@@ -12,11 +12,13 @@ import {
 import { NotificationsProvider, showNotification, updateNotification } from '@mantine/notifications';
 
 import {
-  ApiCaller, QueryCaller, useSalesforceApi, useSalesforceApiCaller,
+  ApiCaller,
+  MakeApiCall, QueryCaller, useSalesforceApi, useSalesforceApiCaller,
 } from '../../hooks/useSalesforceQuery';
 import useDebounce from '../../hooks/useDebounce';
 import { useAsyncState2 } from '../../hooks/useAsyncState';
 import useLocation from '../../hooks/useLocation';
+import { FieldLookupResult } from './salesforceApiResults';
 
 interface SObjectDescribeResult {
   fields:Array<{name: string;
@@ -77,7 +79,8 @@ class ActionCache {
 const actionCache = new ActionCache();
 
 async function getOptions(
-  makeApiQuery: QueryCaller,
+  apiCaller: ApiCaller,
+  sobjectName: string | undefined,
   selection: Array<string>,
   currentQuery: string,
   describeResult?: SObjectDescribeResult,
@@ -104,10 +107,21 @@ async function getOptions(
               console.log('Going to search referenceTo', field.referenceTo);
               const query = currentQuery.length > 0 ? `select Id, Name from ${referenceTo} where name like '%${currentQuery}%' limit 10` :
                 `SELECT Id, Name FROM RecentlyViewed WHERE Type='${referenceTo}' ORDER BY LastViewedDate DESC`;
-              const results = await makeApiQuery<{ Id: string; Name: string;}>(query);
-              console.log('results', results);
+
+              const lookupUrl = new URL(`/services/data/v55.0/ui-api/lookups/${sobjectName}/${field.name}/${referenceTo}?searchType=Recent`, window.location.href);
+              if (currentQuery.length >= 2) {
+                lookupUrl.searchParams.set('q', currentQuery);
+                lookupUrl.searchParams.set('searchType', 'Search');
+              }
+              const lookupResults = await apiCaller.makeApiCall<FieldLookupResult>(lookupUrl.pathname + lookupUrl.search);
+              const lookupOptions = lookupResults.records.map((r) => {
+                const label = r.fields.Name.value;
+                const disambiguationField = r.fields.DisambiguationField;
+                return ({ value: r.id, label: disambiguationField ? `${label} (${disambiguationField.value})` : label });
+              });
+
               return [UpdateAction, { value: field.name, label: field.label },
-                ...results.records.map((r) => actionCache.get(r.Id, r.Name))];
+                ...lookupOptions];
             }
 
             return [UpdateAction, { value: field.name, label: field.label }];
@@ -138,12 +152,12 @@ async function getOptions(
 
 interface ActionExecutor {
   canExecute: (selection: Array<string>)=>boolean;
-  execute: (makeApiCall: ApiCaller, selection: Array<string>) => Promise<string>;
+  execute: (makeApiCall: MakeApiCall, selection: Array<string>) => Promise<string>;
 }
 
 const actionExecutors: Array<ActionExecutor> = [{
   canExecute: (selection: Array<string>) => selection[0] === 'update' && selection.length === 3,
-  execute: async (makeApiCall: ApiCaller, [, fieldName, updatedValue]) => {
+  execute: async (makeApiCall: MakeApiCall, [, fieldName, updatedValue]) => {
     if (!fieldName) { return 'nothing updated'; }
     const id = uuid();
     showNotification({
@@ -200,13 +214,13 @@ function ToDisplay({ cookie, onClose }: {cookie: browser.Cookies.Cookie; onClose
   const { results, isLoading } = useSalesforceApi<SObjectDescribeResult>({ url: apiUrl, cookie, useCache: false });
   const [query, setQuery] = useState('');
   const [debouncedQuery, immediatelySetDebouncedQuery] = useDebounce(query, 500);
-  const { makeApiCall, makeApiQuery } = useSalesforceApiCaller({ cookie });
+  const apiCaller: ApiCaller = useSalesforceApiCaller({ cookie });
+  const { makeApiCall, makeApiQuery } = apiCaller;
 
-  const [options, optionsLoading] = useAsyncState2(getOptions, makeApiQuery, value2, debouncedQuery, results);
+  const [options, optionsLoading] = useAsyncState2(getOptions, apiCaller, sobjectName, value2, debouncedQuery, results);
 
   // const options: Array<SelectItem> = useMemo(() => getOptions(value2, debouncedQuery, results), [value2, results, debouncedQuery]);
   const handleChange = useCallback((updatedValue: Array<string>) => {
-    console.log('options:', options);
     for (const executor of actionExecutors) {
       if (executor.canExecute(updatedValue)) {
         console.debug('Executing', executor, updatedValue, options);
@@ -220,6 +234,8 @@ function ToDisplay({ cookie, onClose }: {cookie: browser.Cookies.Cookie; onClose
     immediatelySetDebouncedQuery('');
   }, [recordId, makeApiCall, options]);
 
+  const isBusy = isLoading || optionsLoading || query !== debouncedQuery;
+
   return (
     <Modal title="Salesforce actions" onClose={onClose} opened overflow="inside">
       <MultiSelect
@@ -231,7 +247,7 @@ function ToDisplay({ cookie, onClose }: {cookie: browser.Cookies.Cookie; onClose
         data={options || []}
         label="Your favorite frameworks/libraries"
         placeholder="Pick all that you like"
-        rightSection={isLoading || optionsLoading ? <Loader size={16} /> : null}
+        rightSection={isBusy ? <Loader size={16} /> : null}
       />
       {JSON.stringify(results)}
     </Modal>
