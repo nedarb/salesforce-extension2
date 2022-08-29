@@ -46,7 +46,7 @@ const App = () => {
     .filter((url) => !!url)
     .map((url) => url?.host));
   const [specificCookie, setSpecificCookie] = useState<browser.Cookies.Cookie | undefined>();
-  const [currentTab, isCurrentTabLoading] = useCurrentTab('https://*.lightning.force.com/*');
+  const [currentTab, isCurrentTabLoading] = useCurrentTab();
   const currentTabUrl = [urlToSalesforceMyDomain(windowUrl.searchParams.get('domain')) ?? undefined, specificCookie?.domain ? `https://${specificCookie.domain}` : undefined, currentTab?.url, ...salesforceTabs?.map((t) => t.url).filter(Boolean) || []].filter(Boolean)[0];
 
   const [cookie, isCookieLoading] = useBrowserCookie({
