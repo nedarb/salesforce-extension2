@@ -23,7 +23,6 @@ function Labelize({ label, children }: {label?: string; children: ReactNode}) {
 function RenderObject({ label, value, domain }: {label?: string; value: any; domain: string}) {
   if (value === null || value === undefined) { return null; }
   const type = typeof value;
-  console.log(label, type, value);
   if (type === 'string' || type === 'number') {
     if (label === 'Id') {
       const url = `https://${domain}/${value}`;
@@ -70,6 +69,8 @@ function RenderObject({ label, value, domain }: {label?: string; value: any; dom
   );
 }
 
+const DATETIME_REGEX = /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}\+\d{4}/;
+
 function RenderCell({
   name, value, domain, href,
 }: { name: string; value: any; domain: string; href?: string }) {
@@ -88,6 +89,13 @@ function RenderCell({
         <a href={href} target="_blank">{value}</a>
       </td>
     );
+  }
+  if (typeof value === 'string') {
+    // check if it's a datetime
+    const isDate = DATETIME_REGEX.test(value);
+    if (isDate) {
+      return <td className="date">{new Date(value).toLocaleString()}</td>;
+    }
   }
   return <td>{value}</td>;
 }

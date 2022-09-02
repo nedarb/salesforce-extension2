@@ -114,6 +114,12 @@ const App = () => {
     );
   }
 
+  const titleEl = document.head.querySelector('title');
+  if (titleEl) {
+    const { host } = new URL(domain);
+    titleEl.innerText = `Explore org: ${host}`;
+  }
+
   return (
     <SalesforceSession domain={domain}>
       <LoggedIntoSalesforce />

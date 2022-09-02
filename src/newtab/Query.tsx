@@ -80,6 +80,7 @@ export default function Query({ cookie }: { cookie: browser.Cookies.Cookie }) {
           <Autocomplete
             name={QueryFieldName}
             defaultValue={query}
+            limit={20}
             placeholder="SELECT Id, Name FROM User"
             label="Query"
             required
