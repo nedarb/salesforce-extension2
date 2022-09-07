@@ -29,7 +29,6 @@ export default function useBrowserCookie({ url, name }: Params): [browser.Cookie
         const { removed, cookie: changedCookie } = changeInfo;
         const matchesUrlAndName = changedCookie?.domain === domain && changedCookie?.name === name;
         if (matchesUrlAndName) {
-          console.log('changed', changeInfo);
           if (removed) {
             setCookie(undefined);
           } else {
