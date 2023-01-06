@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import browser from 'webextension-polyfill';
 
-function checkPermission(origin: string) {
+function checkPermission(origin?: string) {
+  if (!origin) {
+    return browser.permissions.contains({
+      permissions: ['cookies'],
+    });
+  }
+
   return browser.permissions.contains({
     permissions: ['cookies'],
     origins: [origin],
@@ -50,9 +56,7 @@ export default function useBrowserPermission(origin?: string) {
   }, [origin]);
 
   useEffect(() => {
-    if (origin) {
-      checkPermission(origin).then(setHasPermission);
-    }
+    checkPermission(origin).then(setHasPermission);
   }, [origin]);
 
   return [hasPermission, onRequestPermission, onRemovePermission];

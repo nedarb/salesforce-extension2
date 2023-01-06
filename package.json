@@ -1,5 +1,5 @@
 {
-  "name": "react-chrome-extension-starter",
+  "name": "salesforce-explorer",
   "version": "1.0.0",
   "description": "A zero-config development setup for building chrome extensions in react and typescript",
   "main": "index.js",

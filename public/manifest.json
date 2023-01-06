@@ -1,5 +1,6 @@
 {
   "manifest_version": 3,
+  "name": "Salesforce Explorer",
   "background": {
     "service_worker": "serviceWorker.js"
   },
@@ -24,8 +25,12 @@
   },
   "content_scripts": [
     {
-      "matches": ["*://*/*"],
-      "js": ["js/contentscript.js"]
+      "matches": [
+        "*://*/*"
+      ],
+      "js": [
+        "js/contentscript.js"
+      ]
     }
   ],
   "icons": {
@@ -33,7 +38,15 @@
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "host_permissions": ["https://*.my.salesforce.com/*"],
-  "permissions": ["activeTab"],
-  "optional_permissions": ["cookies"]
+  "host_permissions": [
+    "https://*.my.salesforce.com/*",
+    "https://*.my.localhost.sfdcdev.salesforce.com/*",
+    "https://*.lightning.localhost.sfdcdev.force.com/*"
+  ],
+  "permissions": [
+    "activeTab"
+  ],
+  "optional_permissions": [
+    "cookies"
+  ]
 }

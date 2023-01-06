@@ -13,15 +13,16 @@ export default function useBrowserCookie({ url, name }: Params): [browser.Cookie
   );
   const [isLoading, setIsLoading] = useState(!!url);
   const domain = useMemo(() => (url ? new URL(url) : undefined)?.host, [url]);
-  console.debug('domain', domain);
+
+  const cookieApi: browser.Cookies.Static | undefined = browser.cookies;
   useEffect(() => {
     setLastUrl(url);
 
-    if (url) {
-      console.log('foobar', url, name);
+
+    if (url && cookieApi) {
       setIsLoading(true);
 
-      browser.cookies?.get({ url, name }).then((result) => {
+      cookieApi?.get({ url, name }).then((result) => {
         setCookie(result);
       }).finally(() => setIsLoading(false));
 
@@ -36,9 +37,9 @@ export default function useBrowserCookie({ url, name }: Params): [browser.Cookie
           }
         }
       };
-      browser.cookies?.onChanged.addListener(onChange);
+      cookieApi?.onChanged.addListener(onChange);
 
-      return () => browser.cookies?.onChanged.removeListener(onChange);
+      return () => cookieApi?.onChanged.removeListener(onChange);
     }
 
     return () => {};

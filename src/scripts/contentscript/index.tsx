@@ -278,7 +278,7 @@ function App() {
 }
 
 const el = document.createElement('div');
-el.id = 'sf-extension';
+el.id = 'sf-extension' + Math.random();
 document.body.appendChild(el);
 
 ReactDOM.render(
