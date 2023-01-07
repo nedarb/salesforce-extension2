@@ -5,6 +5,7 @@ import {
   Grid,
   Group,
   MultiSelect,
+  Paper,
   Select,
   Switch,
   TextInput,
@@ -166,7 +167,7 @@ export default function Query({ cookie }: { cookie: browser.Cookies.Cookie }) {
 
   const handleKeyUp: React.KeyboardEventHandler<HTMLInputElement> = (e) => {
     if (e.key === 'Enter') {
-      const { value } = (e.target as HTMLInputElement);
+      const { value } = e.target as HTMLInputElement;
       setQuery(value);
       immediatelyUpdate(value);
     }
@@ -273,7 +274,7 @@ export default function Query({ cookie }: { cookie: browser.Cookies.Cookie }) {
 
               console.log(unionedFields);
               return (
-                <div key={field.name}>
+                <Paper key={field.name} shadow="xs" p="md" m="xs" withBorder>
                   <MultiSelect
                     label={`Select relationship: ${field.relationshipName}`}
                     data={[...unionedFields.values()].map((f) => ({
@@ -281,7 +282,7 @@ export default function Query({ cookie }: { cookie: browser.Cookies.Cookie }) {
                       label: f.label,
                     }))}
                   />
-                </div>
+                </Paper>
               );
             })}
         </Grid.Col>
