@@ -1,4 +1,3 @@
-/* eslint-disable no-restricted-syntax */
 // SELECT Id, sfLma__Org_Instance__c from sfLma__License__c LIMIT 10
 /* eslint-disable implicit-arrow-linebreak */
 import {
@@ -167,7 +166,7 @@ export default function Query({ cookie }: { cookie: browser.Cookies.Cookie }) {
 
   const handleKeyUp: React.KeyboardEventHandler<HTMLInputElement> = (e) => {
     if (e.key === 'Enter') {
-      const { value } = e.target as HTMLInputElement;
+      const { value } = (e.target as HTMLInputElement);
       setQuery(value);
       immediatelyUpdate(value);
     }
