@@ -1,6 +1,11 @@
 /* eslint-disable no-restricted-syntax */
 import {
-  useCallback, useContext, useEffect, useMemo, useRef, useState,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
 } from 'react';
 import browser from 'webextension-polyfill';
 import { v4 as uuid } from 'uuid';
@@ -118,11 +123,7 @@ export type MakeApiCall<T = any> = (
 export type QueryCaller<T = any> = (query: string) => Promise<T>;
 
 export interface ApiCaller {
-  makeApiCall: <T>(
-    url: string,
-    method?: HttpMethod,
-    data?: any,
-  ) => Promise<T>,
+  makeApiCall: <T>(url: string, method?: HttpMethod, data?: any) => Promise<T>;
   makeApiQuery: <T>(query: string) => Promise<QueryResults<T>>;
 }
 
@@ -191,7 +192,10 @@ export function useSalesforceApiCaller({
     };
   }, [pendingCalls]);
 
-  const apiCaller: ApiCaller = useMemo(() => ({ makeApiCall: makeApiCall1, makeApiQuery }), [makeApiCall1, makeApiQuery]);
+  const apiCaller: ApiCaller = useMemo(
+    () => ({ makeApiCall: makeApiCall1, makeApiQuery }),
+    [makeApiCall1, makeApiQuery],
+  );
 
   return apiCaller;
 }
@@ -203,13 +207,19 @@ export function useSalesforceApi<
   url,
   cookie,
   useCache,
+  method = 'GET',
+  data,
 }: {
   url?: string;
+  method?: 'GET' | 'POST';
+  data?: any;
 } & BaseParams) {
   const [results, setResults] = useState<T | undefined>(undefined);
   const [error, setError] = useState<TError | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(false);
   const { domain, onSessionExpired } = useContext(SalesforceContext);
+
+  const stringifiedData = data ? JSON.stringify(data) : undefined;
 
   useEffect(() => {
     if (url && cookie) {
@@ -230,10 +240,15 @@ export function useSalesforceApi<
 
       setIsLoading(true);
       setError(undefined);
+      setResults(undefined);
       fetch(finalUrl.toString(), {
-        method: 'GET',
-        headers: { Authorization: `Bearer ${cookie.value}` },
+        method,
+        headers: {
+          Authorization: `Bearer ${cookie.value}`,
+          'Content-Type': 'application/json',
+        },
         signal,
+        body: stringifiedData,
       })
         .then(async (result) => {
           if (result.ok) {
@@ -278,7 +293,7 @@ export function useSalesforceApi<
     setResults(undefined);
 
     return () => {};
-  }, [url, cookie]);
+  }, [url, cookie, stringifiedData]);
 
   return { results, isLoading, error };
 }
