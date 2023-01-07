@@ -91,7 +91,7 @@ module.exports = (env) => {
         filename: 'serviceworker.js',
       }),
       // ...getEntries('UIElements'),
-      ...getEntries('scripts', 'index.ts'),
+      ...getEntries('scripts', 'index.tsx'),
     }),
     output: {
       path: path.resolve(__dirname, 'build'),

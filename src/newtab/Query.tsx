@@ -1,3 +1,4 @@
+// SELECT Id, sfLma__Org_Instance__c from sfLma__License__c LIMIT 10
 /* eslint-disable implicit-arrow-linebreak */
 import {
   Autocomplete,
@@ -36,6 +37,14 @@ export default function Query({ cookie }: { cookie: browser.Cookies.Cookie }) {
     }
   };
 
+  const handleKeyUp: React.KeyboardEventHandler<HTMLInputElement> = (e) => {
+    if (e.key === 'Enter') {
+      const { value } = (e.target as HTMLInputElement);
+      setQuery(value);
+      immediatelyUpdate(value);
+    }
+  };
+
   const forcePathUpdate = useCallback(
     (updatedPath) => {
       setQuery(updatedPath);
@@ -71,11 +80,16 @@ export default function Query({ cookie }: { cookie: browser.Cookies.Cookie }) {
           <Autocomplete
             name={QueryFieldName}
             defaultValue={query}
+            limit={20}
             placeholder="SELECT Id, Name FROM User"
             label="Query"
             required
             data={queryOptions}
-            onItemSubmit={(item) => { setQuery(item.value); immediatelyUpdate(item.value); }}
+            onKeyUp={handleKeyUp}
+            onItemSubmit={(item) => {
+              setQuery(item.value);
+              immediatelyUpdate(item.value);
+            }}
           />
         </Grid.Col>
         <Grid.Col span={3}>

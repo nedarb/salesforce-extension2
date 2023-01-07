@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import browser from 'webextension-polyfill';
 
 export interface Params {
@@ -12,14 +12,37 @@ export default function useBrowserCookie({ url, name }: Params): [browser.Cookie
     undefined,
   );
   const [isLoading, setIsLoading] = useState(!!url);
+  const domain = useMemo(() => (url ? new URL(url) : undefined)?.host, [url]);
+
+  const cookieApi: browser.Cookies.Static | undefined = browser.cookies;
   useEffect(() => {
-    if (url) {
+    setLastUrl(url);
+
+
+    if (url && cookieApi) {
       setIsLoading(true);
-      browser.cookies?.get({ url, name }).then((result) => {
+
+      cookieApi?.get({ url, name }).then((result) => {
         setCookie(result);
       }).finally(() => setIsLoading(false));
+
+      const onChange = (changeInfo: browser.Cookies.OnChangedChangeInfoType) => {
+        const { removed, cookie: changedCookie } = changeInfo;
+        const matchesUrlAndName = changedCookie?.domain === domain && changedCookie?.name === name;
+        if (matchesUrlAndName) {
+          if (removed) {
+            setCookie(undefined);
+          } else {
+            setCookie(changedCookie);
+          }
+        }
+      };
+      cookieApi?.onChanged.addListener(onChange);
+
+      return () => cookieApi?.onChanged.removeListener(onChange);
     }
-    setLastUrl(url);
+
+    return () => {};
   }, [url, name]);
 
   const isActuallyLoading = isLoading || lastUrl !== url;

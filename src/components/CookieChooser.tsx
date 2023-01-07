@@ -7,8 +7,10 @@ import urlToSalesforceMyDomain from '../common/SalesforceUtils';
 import { byStringSelector } from '../common/sorters';
 
 async function getSalesforceSessionCookies() {
-  const cookies = await browser.cookies.getAll({ name: 'sid' });
-  return cookies.filter((cookie) => cookie.domain.endsWith('.my.salesforce.com')).sort(byStringSelector((cookie) => cookie.domain));
+  const c = browser.cookies;
+  const cookies = (await c?.getAll({ name: 'sid' })) || [];
+  return cookies.filter((cookie) => cookie.domain.endsWith('.my.salesforce.com') || cookie.domain.endsWith('.my.localhost.sfdcdev.salesforce.com'))
+    .sort(byStringSelector((cookie) => cookie.domain));
 }
 
 function ensureDomain(domainOrUrl?: string) : URL | undefined {
