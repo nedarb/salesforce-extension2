@@ -23,6 +23,7 @@ import useDebounce from '../hooks/useDebounce';
 import useLocalStorage from '../hooks/useLocalStorage';
 import { useSalesforceApi } from '../hooks/useSalesforceQuery';
 import ApiResults from './ApiResults';
+import QueryBuilder from './QueryBuilder';
 
 const QueryFieldName = 'query';
 
@@ -65,23 +66,6 @@ export default function Query({ cookie }: { cookie: browser.Cookies.Cookie }) {
     'SELECT count() from User',
   );
   const [debounced, immediatelyUpdate] = useDebounce(query);
-
-  const {
-    results: globalResults,
-    isLoading,
-    error,
-  } = useSalesforceApi<{
-    sobjects: { name: string; label: string; queryable: boolean }[];
-  }>({
-    url: '/services/data/v52.0/sobjects',
-    cookie,
-    useCache: true,
-  });
-
-  const queryableObjects = useMemo(
-    () => (globalResults?.sobjects ?? []).filter((o) => o.queryable),
-    [globalResults],
-  );
 
   const { results: currentObjectDescribeResult } =
     useSalesforceApi<SObjectDescribeResult>({
@@ -207,85 +191,10 @@ export default function Query({ cookie }: { cookie: browser.Cookies.Cookie }) {
 
   const queryOptions: Array<string> = [...new Set(recentQueries || [])];
 
-  const setSourceObject = (source: string) => {
-    const selectedColumns =
-      source !== draftQuery?.source ? [] : draftQuery?.selectedColumns || [];
-    setDraftQuery({ ...draftQuery, selectedColumns, source });
-  };
-  const setSelectedColumns = (selectedColumns: string[]) =>
-    setDraftQuery({ source: '', ...draftQuery, selectedColumns });
-
   return (
     <form onSubmit={handleSubmit}>
+      <QueryBuilder cookie={cookie} />
       <Grid>
-        <Grid.Col span={3}>
-          <Select
-            label="Source object"
-            value={draftQuery?.source}
-            onChange={setSourceObject}
-            searchable
-            limit={100}
-            placeholder="Select object"
-            nothingFound="No results found."
-            data={
-              queryableObjects.map((o) => ({
-                value: o.name,
-                label: o.label,
-              })) || []
-            }
-          />
-        </Grid.Col>
-        <Grid.Col span={3}>
-          <MultiSelect
-            searchable
-            label="Selected columns"
-            placeholder="Select columns"
-            nothingFound="No results found."
-            limit={100}
-            value={draftQuery?.selectedColumns}
-            onChange={setSelectedColumns}
-            data={
-              currentObjectDescribeResult?.fields.map((o) => ({
-                value: o.name,
-                label: o.label,
-              })) || []
-            }
-          />
-        </Grid.Col>
-        <Grid.Col span={12}>
-          {selectedFields
-            .filter((field) => field.relationshipName)
-            .map((field) => {
-              const unionedFields = (
-                field.referenceTo?.map(
-                  (obj) => relationshipDescribesMap?.[obj],
-                ) || []
-              ).reduce<Map<string, SObjectDescribeField>>(
-                (map, describeResult) => {
-                  if (describeResult) {
-                    for (const f of describeResult.fields) {
-                      map.set(f.name, f);
-                    }
-                  }
-                  return map;
-                },
-                new Map(),
-              );
-
-              console.log(unionedFields);
-              return (
-                <Paper key={field.name} shadow="xs" p="md" m="xs" withBorder>
-                  <MultiSelect
-                    label={`Select relationship: ${field.relationshipName}`}
-                    data={[...unionedFields.values()].map((f) => ({
-                      value: f.name,
-                      label: f.label,
-                    }))}
-                  />
-                </Paper>
-              );
-            })}
-        </Grid.Col>
         <Grid.Col span={9}>
           <Autocomplete
             name={QueryFieldName}
