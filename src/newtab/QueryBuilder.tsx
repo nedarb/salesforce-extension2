@@ -1,3 +1,4 @@
+/* eslint-disable react/require-default-props */
 import {
   Grid, MultiSelect, Paper, Select,
 } from '@mantine/core';
@@ -32,15 +33,20 @@ type SObjectDescribeField = {
   referenceTo?: string[];
 };
 
+interface Props {
+  cookie: browser.Cookies.Cookie;
+  relationshipName?: string;
+  specificObject?: string;
+  depth?: number;
+}
+
 export default function QueryBuilder({
   cookie,
   relationshipName,
   specificObject,
-}: {
-  cookie: browser.Cookies.Cookie;
-  relationshipName?: string;
-  specificObject?: string;
-}) {
+  depth,
+}: Props) {
+  const currentDepth = depth ?? 1;
   const {
     results: globalResults,
     isLoading,
@@ -153,25 +159,27 @@ export default function QueryBuilder({
           />
         </Grid.Col>
 
-        <Grid.Col span={3}>
-          <MultiSelect
-            searchable
-            label="Selected relationships"
-            placeholder="Select relationships"
-            nothingFound="No results found."
-            value={draftQuery?.relationships}
-            onChange={setSelectedRelationships}
-            limit={100}
-            data={
-              currentObjectDescribeResult?.childRelationships
-                .filter((r) => r.relationshipName)
-                .map((o) => ({
-                  value: o.relationshipName,
-                  label: o.relationshipName,
-                })) || []
-            }
-          />
-        </Grid.Col>
+        {currentDepth < 3 && (
+          <Grid.Col span={3}>
+            <MultiSelect
+              searchable
+              label="Selected relationships"
+              placeholder="Select relationships"
+              nothingFound="No results found."
+              value={draftQuery?.relationships}
+              onChange={setSelectedRelationships}
+              limit={100}
+              data={
+                currentObjectDescribeResult?.childRelationships
+                  .filter((r) => r.relationshipName)
+                  .map((o) => ({
+                    value: o.relationshipName,
+                    label: o.relationshipName,
+                  })) || []
+              }
+            />
+          </Grid.Col>
+        )}
         {currentObjectDescribeResult?.childRelationships
           .filter((r) => draftQuery?.relationships?.includes(r.relationshipName))
           .map((r) => (
@@ -181,6 +189,7 @@ export default function QueryBuilder({
                 cookie={cookie}
                 relationshipName={r.relationshipName}
                 specificObject={r.childSObject}
+                depth={currentDepth + 1}
               />
             </Grid.Col>
           ))}
