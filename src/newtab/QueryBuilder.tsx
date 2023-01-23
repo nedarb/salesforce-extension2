@@ -10,7 +10,7 @@ import { useSalesforceApi } from '../hooks/useSalesforceQuery';
 interface Query {
   source: string;
   selectedColumns: string[];
-  relationships?: string[];
+  relationshipQueries?: Query[];
 }
 
 type SObjectDescribeResult = {
@@ -65,7 +65,10 @@ export default function QueryBuilder({
   );
 
   const [draftQuery, setDraftQuery] = relationshipName
-    ? useState<Query>(() => (specificObject ? { source: specificObject } : undefined))
+    ? useState<Query>(() => ({
+      source: specificObject ?? '',
+      selectedColumns: [],
+    }))
     : useLocalStorage<Query>(`draftQuery:${cookie.domain}`);
 
   const selectedObjectName = specificObject ?? draftQuery?.source;
@@ -90,21 +93,32 @@ export default function QueryBuilder({
       ...draftQuery,
       selectedColumns,
       source,
-      relationships: [],
     });
   };
   const setSelectedColumns = (selectedColumns: string[]) => setDraftQuery({
     source: '',
-    relationships: [],
     ...draftQuery,
     selectedColumns,
   });
 
-  const setSelectedRelationships = (selectedRelationships: string[]) => setDraftQuery({
-    source: '',
-    selectedColumns: [],
-    ...draftQuery,
-    relationships: selectedRelationships,
+  const selectedRelationships = useMemo(
+    () => draftQuery?.relationshipQueries?.map((q) => q.source),
+    [draftQuery],
+  );
+
+  const setSelectedRelationships = (newSelectedRelationships: string[]) => setDraftQuery((existing) => {
+    const relationshipQueries: Query[] = newSelectedRelationships.map(
+      (sourceName) => existing.relationshipQueries?.find(
+        (r) => r.source === sourceName,
+      ) ?? { source: sourceName, selectedColumns: [] },
+    );
+    return {
+      source: '',
+      selectedColumns: [],
+      ...draftQuery,
+      relationships: selectedRelationships,
+      relationshipQueries,
+    };
   });
 
   const fieldMap = useMemo(
@@ -166,7 +180,7 @@ export default function QueryBuilder({
               label="Selected relationships"
               placeholder="Select relationships"
               nothingFound="No results found."
-              value={draftQuery?.relationships}
+              value={selectedRelationships}
               onChange={setSelectedRelationships}
               limit={100}
               data={
@@ -180,8 +194,11 @@ export default function QueryBuilder({
             />
           </Grid.Col>
         )}
+        <Grid.Col span={12} ml="xl">
+          WHERE
+        </Grid.Col>
         {currentObjectDescribeResult?.childRelationships
-          .filter((r) => draftQuery?.relationships?.includes(r.relationshipName))
+          .filter((r) => selectedRelationships?.includes(r.relationshipName))
           .map((r) => (
             <Grid.Col span={12} key={r.relationshipName} ml="lg">
               {r.relationshipName}
