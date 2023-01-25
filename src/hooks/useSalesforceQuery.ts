@@ -200,6 +200,25 @@ export function useSalesforceApiCaller({
   return apiCaller;
 }
 
+class FetchWrapper {
+  private ongoingCalls = new Map<string, Promise<Response>>();
+
+  fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+    const cacheKey = JSON.stringify(input);
+    const existing = this.ongoingCalls.get(cacheKey);
+    if (existing) {
+      return existing;
+    }
+
+    const result = fetch(input, init);
+    this.ongoingCalls.set(cacheKey, result);
+    result.finally(() => this.ongoingCalls.delete(cacheKey));
+    return result;
+  }
+}
+
+const fetchWrapper = new FetchWrapper();
+
 export function useSalesforceApi<
   T = any,
   TError = Array<{ errorCode: string; message: string }>,
@@ -241,15 +260,16 @@ export function useSalesforceApi<
       setIsLoading(true);
       setError(undefined);
       setResults(undefined);
-      fetch(finalUrl.toString(), {
-        method,
-        headers: {
-          Authorization: `Bearer ${cookie.value}`,
-          'Content-Type': 'application/json',
-        },
-        signal,
-        body: stringifiedData,
-      })
+      fetchWrapper
+        .fetch(finalUrl.toString(), {
+          method,
+          headers: {
+            Authorization: `Bearer ${cookie.value}`,
+            'Content-Type': 'application/json',
+          },
+          signal,
+          body: stringifiedData,
+        })
         .then(async (result) => {
           if (result.ok) {
             if (result.status === 204) {

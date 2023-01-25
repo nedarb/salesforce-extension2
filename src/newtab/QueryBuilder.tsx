@@ -1,16 +1,29 @@
 /* eslint-disable react/require-default-props */
 import {
-  Grid, MultiSelect, Paper, Select,
+  Button,
+  Grid,
+  Input,
+  MultiSelect,
+  NumberInput,
+  Paper,
+  Select,
+  TextInput,
 } from '@mantine/core';
-import React, { useMemo, useState } from 'react';
+import React, {
+  useMemo, useState, useCallback, useEffect,
+} from 'react';
+
 import browser from 'webextension-polyfill';
 import useLocalStorage from '../hooks/useLocalStorage';
 import { useSalesforceApi } from '../hooks/useSalesforceQuery';
 
 interface Query {
-  source: string;
+  relationshipNameOrSourceObject: string;
+  sourceObject?: string;
   selectedColumns: string[];
   relationshipQueries?: Query[];
+  whereConditions?: WhereCondition[];
+  limit?: number;
 }
 
 type SObjectDescribeResult = {
@@ -26,6 +39,69 @@ type SObjectDescribeResult = {
     restrictedDelete: boolean;
   }[];
 };
+
+const Operators = [
+  {
+    value: '=',
+    label: '=',
+  },
+  {
+    value: '!=',
+    label: '≠',
+  },
+  {
+    value: '<',
+    label: '<',
+  },
+  {
+    value: '<=',
+    label: '≤',
+  },
+  {
+    value: '>',
+    label: '>',
+  },
+  {
+    value: '>=',
+    label: '≥',
+  },
+  {
+    value: 'starts',
+    label: 'starts with',
+  },
+  {
+    value: 'ends',
+    label: 'ends with',
+  },
+  {
+    value: 'contains',
+    label: 'contains',
+  },
+  {
+    value: 'IN',
+    label: 'in',
+  },
+  {
+    value: 'NOT IN',
+    label: 'not in',
+  },
+  {
+    value: 'INCLUDES',
+    label: 'includes',
+  },
+  {
+    value: 'EXCLUDES',
+    label: 'excludes',
+  },
+];
+
+type WhereCondition = {
+  id: string;
+  field?: string;
+  operator?: string;
+  value?: string;
+};
+
 type SObjectDescribeField = {
   name: string;
   label: string;
@@ -38,6 +114,21 @@ interface Props {
   relationshipName?: string;
   specificObject?: string;
   depth?: number;
+  defaultQuery?: Query;
+  onQueryChanged?: (query: Query) => void;
+}
+
+function queryToString(query?: Query) {
+  if (!query) {
+    return undefined;
+  }
+  const relationshipQueries: string[] =
+    query?.relationshipQueries?.map(queryToString).map((v) => `(${v})`) ?? [];
+  const cols = [...query.selectedColumns, ...(relationshipQueries ?? [])];
+  const limit = (query.limit ?? 0) > 0 ? ` LIMIT ${query.limit}` : '';
+  return `SELECT ${cols.join(', ')} FROM ${
+    query.relationshipNameOrSourceObject
+  }${limit}`;
 }
 
 export default function QueryBuilder({
@@ -45,6 +136,8 @@ export default function QueryBuilder({
   relationshipName,
   specificObject,
   depth,
+  defaultQuery,
+  onQueryChanged,
 }: Props) {
   const currentDepth = depth ?? 1;
   const {
@@ -54,7 +147,7 @@ export default function QueryBuilder({
   } = useSalesforceApi<{
     sobjects: { name: string; label: string; queryable: boolean }[];
   }>({
-    url: '/services/data/v52.0/sobjects',
+    url: '/services/data/v56.0/sobjects',
     cookie,
     useCache: true,
   });
@@ -65,13 +158,25 @@ export default function QueryBuilder({
   );
 
   const [draftQuery, setDraftQuery] = relationshipName
-    ? useState<Query>(() => ({
-      source: specificObject ?? '',
-      selectedColumns: [],
-    }))
-    : useLocalStorage<Query>(`draftQuery:${cookie.domain}`);
+    ? useState<Query>(
+      () => defaultQuery ?? {
+        relationshipNameOrSourceObject:
+              relationshipName ?? specificObject ?? '',
+        sourceObject: specificObject,
+        selectedColumns: [],
+      },
+    )
+    : useLocalStorage<Query>(`draftRichQuery:${cookie.domain}`);
 
-  const selectedObjectName = specificObject ?? draftQuery?.source;
+  useEffect(() => {
+    console.log('UPDATED QUERY: ', queryToString(draftQuery));
+    if (draftQuery && onQueryChanged && relationshipName) {
+      onQueryChanged(draftQuery);
+    }
+  }, [relationshipName, draftQuery]);
+
+  const selectedObjectName =
+    specificObject ?? draftQuery?.relationshipNameOrSourceObject;
 
   const { results: currentObjectDescribeResult } =
     useSalesforceApi<SObjectDescribeResult>({
@@ -88,37 +193,84 @@ export default function QueryBuilder({
 
   const setSourceObject = (source: string) => {
     const selectedColumns =
-      source !== draftQuery?.source ? [] : draftQuery?.selectedColumns || [];
+      source !== draftQuery?.relationshipNameOrSourceObject
+        ? []
+        : draftQuery?.selectedColumns || [];
     setDraftQuery({
       ...draftQuery,
       selectedColumns,
-      source,
+      relationshipNameOrSourceObject: source,
     });
   };
   const setSelectedColumns = (selectedColumns: string[]) => setDraftQuery({
-    source: '',
+    relationshipNameOrSourceObject: '',
     ...draftQuery,
     selectedColumns,
   });
 
   const selectedRelationships = useMemo(
-    () => draftQuery?.relationshipQueries?.map((q) => q.source),
+    () => draftQuery?.relationshipQueries?.map(
+      (q) => q.relationshipNameOrSourceObject,
+    ),
     [draftQuery],
   );
 
   const setSelectedRelationships = (newSelectedRelationships: string[]) => setDraftQuery((existing) => {
     const relationshipQueries: Query[] = newSelectedRelationships.map(
       (sourceName) => existing.relationshipQueries?.find(
-        (r) => r.source === sourceName,
-      ) ?? { source: sourceName, selectedColumns: [] },
+        (r) => r.relationshipNameOrSourceObject === sourceName,
+      ) ?? {
+        relationshipNameOrSourceObject: sourceName,
+        sourceObject: currentObjectDescribeResult?.childRelationships.find(
+          (r) => r.relationshipName === sourceName,
+        )?.childSObject,
+        selectedColumns: [],
+      },
     );
     return {
-      source: '',
+      relationshipNameOrSourceObject: '',
       selectedColumns: [],
       ...draftQuery,
-      relationships: selectedRelationships,
       relationshipQueries,
     };
+  });
+
+  const addCondition = () => setDraftQuery((existing) => {
+    const conditions = existing.whereConditions ?? [];
+    const newConditions: WhereCondition[] = [
+      ...conditions,
+      { id: conditions.length.toString() },
+    ];
+    return { ...existing, whereConditions: newConditions };
+  });
+
+  const removeCondition = (id: string) => setDraftQuery((existing) => {
+    const conditions = existing.whereConditions ?? [];
+    return {
+      ...existing,
+      whereConditions: conditions.filter((c) => c.id !== id),
+    };
+  });
+
+  const updateCondition = (updates: WhereCondition) => setDraftQuery((existing) => {
+    const conditions = existing.whereConditions ?? [];
+    return {
+      ...existing,
+      whereConditions: conditions.map((c) => (c.id === updates.id ? updates : { ...c })),
+    };
+  });
+
+  const setLimit = (updatedLimit?: number) => setDraftQuery((existing) => {
+    return { ...existing, limit: updatedLimit };
+  });
+
+  const updateRelationshipQuery = (query: Query) => setDraftQuery((existing) => {
+    const queries = existing.relationshipQueries ?? [];
+    const updated: Query[] = queries.map((q) => (q.relationshipNameOrSourceObject ===
+        query.relationshipNameOrSourceObject
+      ? query
+      : { ...q }));
+    return { ...existing, relationshipQueries: updated };
   });
 
   const fieldMap = useMemo(
@@ -139,8 +291,11 @@ export default function QueryBuilder({
       <Grid>
         <Grid.Col span={3}>
           <Select
-            label="Source object"
-            value={draftQuery?.source}
+            label={`Select object ${draftQuery?.sourceObject}`}
+            value={
+              draftQuery?.sourceObject ??
+              draftQuery?.relationshipNameOrSourceObject
+            }
             onChange={setSourceObject}
             searchable
             limit={100}
@@ -195,7 +350,53 @@ export default function QueryBuilder({
           </Grid.Col>
         )}
         <Grid.Col span={12} ml="xl">
-          WHERE
+          {draftQuery?.whereConditions?.map((condition) => (
+            <Grid key={condition.id}>
+              <Grid.Col span={3}>
+                <Select
+                  searchable
+                  label="Selected column"
+                  placeholder="Select column"
+                  nothingFound="No results found."
+                  value={condition.field}
+                  onChange={(v) => updateCondition({ ...condition, field: v ?? undefined })}
+                  limit={100}
+                  data={
+                    currentObjectDescribeResult?.fields.map((o) => ({
+                      value: o.name,
+                      label: o.label,
+                    })) || []
+                  }
+                />
+              </Grid.Col>
+              <Grid.Col span={2}>
+                <Select
+                  searchable
+                  label="Criteria"
+                  placeholder="Criteria"
+                  data={Operators}
+                />
+              </Grid.Col>
+              <Grid.Col span={3}>
+                <TextInput label="Value" />
+              </Grid.Col>
+              <Grid.Col span={2}>
+                <Button onClick={() => removeCondition(condition.id)}>
+                  Remove
+                </Button>
+              </Grid.Col>
+            </Grid>
+          ))}
+          <Button onClick={addCondition} mt="md">
+            Add condition
+          </Button>
+        </Grid.Col>
+        <Grid.Col span={4} ml="xl">
+          <NumberInput
+            label="Limit"
+            value={draftQuery?.limit}
+            onChange={setLimit}
+          />
         </Grid.Col>
         {currentObjectDescribeResult?.childRelationships
           .filter((r) => selectedRelationships?.includes(r.relationshipName))
@@ -207,6 +408,10 @@ export default function QueryBuilder({
                 relationshipName={r.relationshipName}
                 specificObject={r.childSObject}
                 depth={currentDepth + 1}
+                defaultQuery={draftQuery?.relationshipQueries?.find(
+                  (q) => q.relationshipNameOrSourceObject === r.relationshipName,
+                )}
+                onQueryChanged={updateRelationshipQuery}
               />
             </Grid.Col>
           ))}

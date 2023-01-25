@@ -28,7 +28,7 @@ export default function useLocalStorage<T>(
       }
       setValue(finalValue);
     },
-    [name],
+    [name, value],
   );
 
   return [value, actualSet];
