@@ -76,16 +76,12 @@ export default function Query({ cookie }: { cookie: browser.Cookies.Cookie }) {
       useCache: true,
     });
 
-  console.log('selectedObjectDescribeResult', currentObjectDescribeResult);
-
   const selectedFields =
     draftQuery?.selectedColumns.length &&
     currentObjectDescribeResult?.name === draftQuery.source
       ? currentObjectDescribeResult.fields.filter((field) =>
         draftQuery.selectedColumns.includes(field.name))
       : [];
-
-  console.log('selected', currentObjectDescribeResult, selectedFields);
 
   const otherSObjectsToDescribe: string[] = useMemo(
     () =>
@@ -135,8 +131,6 @@ export default function Query({ cookie }: { cookie: browser.Cookies.Cookie }) {
           };
         }, {})
       : undefined;
-
-  console.log('r', relationshipDescribesMap);
 
   const handleSubmit: FormEventHandler<HTMLFormElement> = (e) => {
     e.preventDefault();

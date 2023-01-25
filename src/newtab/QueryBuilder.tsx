@@ -8,6 +8,7 @@ import {
   Paper,
   Select,
   TextInput,
+  Title,
 } from '@mantine/core';
 import React, {
   useMemo, useState, useCallback, useEffect,
@@ -118,17 +119,22 @@ interface Props {
   onQueryChanged?: (query: Query) => void;
 }
 
-function queryToString(query?: Query) {
+export function stringifyQuery(query?: Query) {
   if (!query) {
     return undefined;
   }
   const relationshipQueries: string[] =
-    query?.relationshipQueries?.map(queryToString).map((v) => `(${v})`) ?? [];
+    query?.relationshipQueries?.map(stringifyQuery).map((v) => `(${v})`) ?? [];
   const cols = [...query.selectedColumns, ...(relationshipQueries ?? [])];
+  const condition = query?.whereConditions?.length
+    ? `WHERE ${query.whereConditions
+      .map((c) => `${c.field} ${c.operator} '${c.value}'`)
+      .join(' AND ')}`
+    : '';
   const limit = (query.limit ?? 0) > 0 ? ` LIMIT ${query.limit}` : '';
   return `SELECT ${cols.join(', ')} FROM ${
     query.relationshipNameOrSourceObject
-  }${limit}`;
+  } ${condition} ${limit}`;
 }
 
 export default function QueryBuilder({
@@ -169,7 +175,7 @@ export default function QueryBuilder({
     : useLocalStorage<Query>(`draftRichQuery:${cookie.domain}`);
 
   useEffect(() => {
-    console.log('UPDATED QUERY: ', queryToString(draftQuery));
+    console.log('UPDATED QUERY: ', stringifyQuery(draftQuery));
     if (draftQuery && onQueryChanged && relationshipName) {
       onQueryChanged(draftQuery);
     }
@@ -283,15 +289,52 @@ export default function QueryBuilder({
     [currentObjectDescribeResult],
   );
 
-  console.log('fieldMap', fieldMap);
+  const selectedChildRelationships = useMemo(() => {
+    if (fieldMap && draftQuery?.selectedColumns.length) {
+      return draftQuery.selectedColumns
+        .map((col) => fieldMap.get(col)?.referenceTo)
+        .map((referenceTo) => (referenceTo?.length === 1 ? referenceTo[0] : undefined))
+        .filter(Boolean);
+    }
+    return [];
+  }, [fieldMap, draftQuery?.selectedColumns]);
+
+  const { results: relationshipDescribes } = useSalesforceApi<{
+    hasErrors: boolean;
+    results: { result: SObjectDescribeResult; statusCode: number }[];
+  }>({
+    url:
+      selectedChildRelationships.length > 0
+        ? '/services/data/v56.0/composite/batch'
+        : undefined,
+    cookie,
+    useCache: false,
+    method: 'POST',
+    data: {
+      batchRequests: selectedChildRelationships.map((sobjectName) => ({
+        method: 'GET',
+        url: `v56.0/sobjects/${sobjectName}/describe`,
+      })),
+    },
+  });
+
+  console.log('fieldMap', fieldMap, relationshipDescribes);
+
+  const possibleColumns = useMemo(() => {
+    return (
+      currentObjectDescribeResult?.fields.map((o) => ({
+        value: o.name,
+        label: o.label,
+      })) || []
+    );
+  }, [currentObjectDescribeResult, selectedChildRelationships]);
 
   return (
     <div>
-      Query Builder
       <Grid>
         <Grid.Col span={3}>
           <Select
-            label={`Select object ${draftQuery?.sourceObject}`}
+            label="Select object"
             value={
               draftQuery?.sourceObject ??
               draftQuery?.relationshipNameOrSourceObject
@@ -313,18 +356,13 @@ export default function QueryBuilder({
         <Grid.Col span={3}>
           <MultiSelect
             searchable
-            label="Selected columns"
+            label="Columns"
             placeholder="Select columns"
             nothingFound="No results found."
             limit={100}
             value={draftQuery?.selectedColumns}
             onChange={setSelectedColumns}
-            data={
-              currentObjectDescribeResult?.fields.map((o) => ({
-                value: o.name,
-                label: o.label,
-              })) || []
-            }
+            data={possibleColumns}
           />
         </Grid.Col>
 
@@ -332,8 +370,8 @@ export default function QueryBuilder({
           <Grid.Col span={3}>
             <MultiSelect
               searchable
-              label="Selected relationships"
-              placeholder="Select relationships"
+              label="Subqueries"
+              placeholder="Select any subquery relationships"
               nothingFound="No results found."
               value={selectedRelationships}
               onChange={setSelectedRelationships}
@@ -374,11 +412,23 @@ export default function QueryBuilder({
                   searchable
                   label="Criteria"
                   placeholder="Criteria"
+                  value={condition.operator}
                   data={Operators}
+                  onChange={(updates) => updateCondition({
+                    ...condition,
+                    operator: updates ?? undefined,
+                  })}
                 />
               </Grid.Col>
               <Grid.Col span={3}>
-                <TextInput label="Value" />
+                <TextInput
+                  label="Value"
+                  value={condition.value}
+                  onChange={(updates) => updateCondition({
+                    ...condition,
+                    value: updates.target.value,
+                  })}
+                />
               </Grid.Col>
               <Grid.Col span={2}>
                 <Button onClick={() => removeCondition(condition.id)}>
@@ -402,7 +452,7 @@ export default function QueryBuilder({
           .filter((r) => selectedRelationships?.includes(r.relationshipName))
           .map((r) => (
             <Grid.Col span={12} key={r.relationshipName} ml="lg">
-              {r.relationshipName}
+              <Title order={5}>Subquery: {r.relationshipName}</Title>
               <QueryBuilder
                 cookie={cookie}
                 relationshipName={r.relationshipName}
