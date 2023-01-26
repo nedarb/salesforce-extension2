@@ -119,8 +119,20 @@ interface Props {
   onQueryChanged?: (query: Query) => void;
 }
 
+function stringifyCondition(condition: WhereCondition): string | undefined {
+  if (condition.field && condition.operator) {
+    if (condition.operator === 'contains') {
+      return `${condition.field} LIKE '%${condition.value}%'`;
+    }
+    return `${condition.field} ${condition.operator} '${condition.value}'`;
+  }
+  return undefined;
+}
+
+export function stringifyQuery(query: Query): string;
+export function stringifyQuery(query?: Query): string | undefined;
 export function stringifyQuery(query?: Query) {
-  if (!query) {
+  if (!query || query.selectedColumns.length === 0) {
     return undefined;
   }
   const relationshipQueries: string[] =
@@ -128,7 +140,8 @@ export function stringifyQuery(query?: Query) {
   const cols = [...query.selectedColumns, ...(relationshipQueries ?? [])];
   const condition = query?.whereConditions?.length
     ? `WHERE ${query.whereConditions
-      .map((c) => `${c.field} ${c.operator} '${c.value}'`)
+      .map(stringifyCondition)
+      .filter(Boolean)
       .join(' AND ')}`
     : '';
   const limit = (query.limit ?? 0) > 0 ? ` LIMIT ${query.limit}` : '';
@@ -176,10 +189,10 @@ export default function QueryBuilder({
 
   useEffect(() => {
     console.log('UPDATED QUERY: ', stringifyQuery(draftQuery));
-    if (draftQuery && onQueryChanged && relationshipName) {
+    if (draftQuery && onQueryChanged) {
       onQueryChanged(draftQuery);
     }
-  }, [relationshipName, draftQuery]);
+  }, [draftQuery]);
 
   const selectedObjectName =
     specificObject ?? draftQuery?.relationshipNameOrSourceObject;
@@ -206,6 +219,7 @@ export default function QueryBuilder({
       ...draftQuery,
       selectedColumns,
       relationshipNameOrSourceObject: source,
+      relationshipQueries: [],
     });
   };
   const setSelectedColumns = (selectedColumns: string[]) => setDraftQuery({
@@ -330,142 +344,140 @@ export default function QueryBuilder({
   }, [currentObjectDescribeResult, selectedChildRelationships]);
 
   return (
-    <div>
-      <Grid>
-        <Grid.Col span={3}>
-          <Select
-            label="Select object"
-            value={
-              draftQuery?.sourceObject ??
-              draftQuery?.relationshipNameOrSourceObject
-            }
-            onChange={setSourceObject}
-            searchable
-            limit={100}
-            placeholder="Select object"
-            nothingFound="No results found."
-            disabled={!!specificObject}
-            data={
-              queryableObjects.map((o) => ({
-                value: o.name,
-                label: o.label,
-              })) || []
-            }
-          />
-        </Grid.Col>
-        <Grid.Col span={3}>
+    <Grid>
+      <Grid.Col span={4}>
+        <Select
+          label="Select object"
+          value={
+            draftQuery?.sourceObject ??
+            draftQuery?.relationshipNameOrSourceObject
+          }
+          onChange={setSourceObject}
+          searchable
+          limit={100}
+          placeholder="Select object"
+          nothingFound="No results found."
+          disabled={!!specificObject}
+          data={
+            queryableObjects.map((o) => ({
+              value: o.name,
+              label: `${o.label} (${o.name})`,
+            })) || []
+          }
+        />
+      </Grid.Col>
+      <Grid.Col span={4}>
+        <MultiSelect
+          searchable
+          label="Columns"
+          placeholder="Select columns"
+          nothingFound="No results found."
+          limit={100}
+          value={draftQuery?.selectedColumns}
+          onChange={setSelectedColumns}
+          data={possibleColumns}
+        />
+      </Grid.Col>
+
+      {currentDepth < 3 && (
+        <Grid.Col span={4}>
           <MultiSelect
             searchable
-            label="Columns"
-            placeholder="Select columns"
+            label="Subqueries"
+            placeholder="Select any subquery relationships"
             nothingFound="No results found."
+            value={selectedRelationships}
+            onChange={setSelectedRelationships}
             limit={100}
-            value={draftQuery?.selectedColumns}
-            onChange={setSelectedColumns}
-            data={possibleColumns}
+            data={
+              currentObjectDescribeResult?.childRelationships
+                .filter((r) => r.relationshipName)
+                .map((o) => ({
+                  value: o.relationshipName,
+                  label: o.relationshipName,
+                })) || []
+            }
           />
         </Grid.Col>
-
-        {currentDepth < 3 && (
-          <Grid.Col span={3}>
-            <MultiSelect
-              searchable
-              label="Subqueries"
-              placeholder="Select any subquery relationships"
-              nothingFound="No results found."
-              value={selectedRelationships}
-              onChange={setSelectedRelationships}
-              limit={100}
-              data={
-                currentObjectDescribeResult?.childRelationships
-                  .filter((r) => r.relationshipName)
-                  .map((o) => ({
-                    value: o.relationshipName,
-                    label: o.relationshipName,
+      )}
+      <Grid.Col span={12}>
+        {draftQuery?.whereConditions?.map((condition) => (
+          <Grid key={condition.id}>
+            <Grid.Col span={3}>
+              <Select
+                searchable
+                label="Selected column"
+                placeholder="Select column"
+                nothingFound="No results found."
+                value={condition.field}
+                onChange={(v) => updateCondition({ ...condition, field: v ?? undefined })}
+                limit={100}
+                data={
+                  currentObjectDescribeResult?.fields.map((o) => ({
+                    value: o.name,
+                    label: o.label,
                   })) || []
-              }
-            />
-          </Grid.Col>
-        )}
-        <Grid.Col span={12} ml="xl">
-          {draftQuery?.whereConditions?.map((condition) => (
-            <Grid key={condition.id}>
-              <Grid.Col span={3}>
-                <Select
-                  searchable
-                  label="Selected column"
-                  placeholder="Select column"
-                  nothingFound="No results found."
-                  value={condition.field}
-                  onChange={(v) => updateCondition({ ...condition, field: v ?? undefined })}
-                  limit={100}
-                  data={
-                    currentObjectDescribeResult?.fields.map((o) => ({
-                      value: o.name,
-                      label: o.label,
-                    })) || []
-                  }
-                />
-              </Grid.Col>
-              <Grid.Col span={2}>
-                <Select
-                  searchable
-                  label="Criteria"
-                  placeholder="Criteria"
-                  value={condition.operator}
-                  data={Operators}
-                  onChange={(updates) => updateCondition({
-                    ...condition,
-                    operator: updates ?? undefined,
-                  })}
-                />
-              </Grid.Col>
-              <Grid.Col span={3}>
-                <TextInput
-                  label="Value"
-                  value={condition.value}
-                  onChange={(updates) => updateCondition({
-                    ...condition,
-                    value: updates.target.value,
-                  })}
-                />
-              </Grid.Col>
-              <Grid.Col span={2}>
-                <Button onClick={() => removeCondition(condition.id)}>
-                  Remove
-                </Button>
-              </Grid.Col>
-            </Grid>
-          ))}
-          <Button onClick={addCondition} mt="md">
-            Add condition
-          </Button>
-        </Grid.Col>
-        <Grid.Col span={4} ml="xl">
-          <NumberInput
-            label="Limit"
-            value={draftQuery?.limit}
-            onChange={setLimit}
-          />
-        </Grid.Col>
-        {currentObjectDescribeResult?.childRelationships
-          .filter((r) => selectedRelationships?.includes(r.relationshipName))
-          .map((r) => (
-            <Grid.Col span={12} key={r.relationshipName} ml="lg">
-              <Title order={5}>Subquery: {r.relationshipName}</Title>
-              <QueryBuilder
-                cookie={cookie}
-                relationshipName={r.relationshipName}
-                specificObject={r.childSObject}
-                depth={currentDepth + 1}
-                defaultQuery={draftQuery?.relationshipQueries?.find(
-                  (q) => q.relationshipNameOrSourceObject === r.relationshipName,
-                )}
-                onQueryChanged={updateRelationshipQuery}
+                }
               />
             </Grid.Col>
-          ))}
-      </Grid>
-    </div>
+            <Grid.Col span={2}>
+              <Select
+                searchable
+                label="Criteria"
+                placeholder="Criteria"
+                value={condition.operator}
+                data={Operators}
+                onChange={(updates) => updateCondition({
+                  ...condition,
+                  operator: updates ?? undefined,
+                })}
+              />
+            </Grid.Col>
+            <Grid.Col span={3}>
+              <TextInput
+                label="Value"
+                value={condition.value}
+                onChange={(updates) => updateCondition({
+                  ...condition,
+                  value: updates.target.value,
+                })}
+              />
+            </Grid.Col>
+            <Grid.Col span={2}>
+              <Button onClick={() => removeCondition(condition.id)}>
+                Remove
+              </Button>
+            </Grid.Col>
+          </Grid>
+        ))}
+        <Button onClick={addCondition} mt="md">
+          Add condition
+        </Button>
+      </Grid.Col>
+      <Grid.Col span={4}>
+        <NumberInput
+          label="Limit"
+          value={draftQuery?.limit}
+          onChange={setLimit}
+        />
+      </Grid.Col>
+      {currentObjectDescribeResult?.childRelationships
+        .filter((r) => selectedRelationships?.includes(r.relationshipName))
+        .map((r) => (
+          <Grid.Col span={12} key={r.relationshipName} ml="lg">
+            <Title order={5}>Subquery: {r.relationshipName}</Title>
+            <QueryBuilder
+              cookie={cookie}
+              relationshipName={r.relationshipName}
+              specificObject={r.childSObject}
+              depth={currentDepth + 1}
+              defaultQuery={draftQuery?.relationshipQueries?.find(
+                (q) => q.relationshipNameOrSourceObject === r.relationshipName,
+              )}
+              onQueryChanged={updateRelationshipQuery}
+            />
+          </Grid.Col>
+        ))}
+    </Grid>
   );
 }

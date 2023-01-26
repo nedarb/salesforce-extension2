@@ -23,7 +23,7 @@ import useDebounce from '../hooks/useDebounce';
 import useLocalStorage from '../hooks/useLocalStorage';
 import { useSalesforceApi } from '../hooks/useSalesforceQuery';
 import ApiResults from './ApiResults';
-import QueryBuilder from './QueryBuilder';
+import QueryBuilder, { stringifyQuery } from './QueryBuilder';
 
 const QueryFieldName = 'query';
 
@@ -187,7 +187,15 @@ export default function Query({ cookie }: { cookie: browser.Cookies.Cookie }) {
 
   return (
     <form onSubmit={handleSubmit}>
-      <QueryBuilder cookie={cookie} />
+      <QueryBuilder
+        cookie={cookie}
+        onQueryChanged={(q) => {
+          const finalQuery = stringifyQuery(q);
+          if (finalQuery !== query) {
+            setQuery(finalQuery);
+          }
+        }}
+      />
       <Grid>
         <Grid.Col span={9}>
           <Autocomplete
