@@ -136,7 +136,10 @@ export function stringifyQuery(query?: Query) {
     return undefined;
   }
   const relationshipQueries: string[] =
-    query?.relationshipQueries?.map(stringifyQuery).map((v) => `(${v})`) ?? [];
+    query?.relationshipQueries
+      ?.map(stringifyQuery)
+      .filter(Boolean)
+      .map((v) => `(${v})`) ?? [];
   const cols = [...query.selectedColumns, ...(relationshipQueries ?? [])];
   const condition = query?.whereConditions?.length
     ? `WHERE ${query.whereConditions
@@ -161,7 +164,7 @@ export default function QueryBuilder({
   const currentDepth = depth ?? 1;
   const {
     results: globalResults,
-    isLoading,
+    isLoading: queryableObjectsLoading,
     error,
   } = useSalesforceApi<{
     sobjects: { name: string; label: string; queryable: boolean }[];
@@ -197,14 +200,16 @@ export default function QueryBuilder({
   const selectedObjectName =
     specificObject ?? draftQuery?.relationshipNameOrSourceObject;
 
-  const { results: currentObjectDescribeResult } =
-    useSalesforceApi<SObjectDescribeResult>({
-      url: selectedObjectName
-        ? `/services/data/v52.0/sobjects/${selectedObjectName}/describe`
-        : undefined,
-      cookie,
-      useCache: true,
-    });
+  const {
+    results: currentObjectDescribeResult,
+    isLoading: currentObjectDescribeResultLoading,
+  } = useSalesforceApi<SObjectDescribeResult>({
+    url: selectedObjectName
+      ? `/services/data/v52.0/sobjects/${selectedObjectName}/describe`
+      : undefined,
+    cookie,
+    useCache: true,
+  });
   console.debug(
     `currentObjectDescribeResult${specificObject}`,
     currentObjectDescribeResult,
@@ -357,7 +362,7 @@ export default function QueryBuilder({
           limit={100}
           placeholder="Select object"
           nothingFound="No results found."
-          disabled={!!specificObject}
+          disabled={!!specificObject || queryableObjectsLoading}
           data={
             queryableObjects.map((o) => ({
               value: o.name,
@@ -373,6 +378,7 @@ export default function QueryBuilder({
           placeholder="Select columns"
           nothingFound="No results found."
           limit={100}
+          disabled={currentObjectDescribeResultLoading}
           value={draftQuery?.selectedColumns}
           onChange={setSelectedColumns}
           data={possibleColumns}
@@ -386,6 +392,7 @@ export default function QueryBuilder({
             label="Subqueries"
             placeholder="Select any subquery relationships"
             nothingFound="No results found."
+            disabled={currentObjectDescribeResultLoading}
             value={selectedRelationships}
             onChange={setSelectedRelationships}
             limit={100}
