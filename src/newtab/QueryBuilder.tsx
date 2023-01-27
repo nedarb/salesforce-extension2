@@ -25,6 +25,10 @@ export interface Query {
   relationshipQueries?: Query[];
   whereConditions?: WhereCondition[];
   limit?: number;
+  orderBy?: {
+    fieldName: string;
+    direction?: string;
+  };
 }
 
 type SObjectDescribeResult = {
@@ -151,9 +155,12 @@ export function stringifyQuery(query?: Query) {
       .join(' AND ')}`
     : '';
   const limit = (query.limit ?? 0) > 0 ? ` LIMIT ${query.limit}` : '';
+  const orderBy = query.orderBy?.fieldName
+    ? ` ORDER BY ${query.orderBy?.fieldName} ${query.orderBy.direction ?? ''}`
+    : '';
   return `SELECT ${cols.join(', ')} FROM ${
     query.relationshipNameOrSourceObject
-  } ${condition} ${limit}`;
+  } ${condition}${orderBy}${limit}`;
 }
 
 export default function QueryBuilder({
@@ -305,6 +312,9 @@ export default function QueryBuilder({
     () => (currentObjectDescribeResult
       ? currentObjectDescribeResult.fields.reduce((map, field) => {
         map.set(field.name, field);
+        if (field.relationshipName) {
+          map.set(field.relationshipName, field);
+        }
         return map;
       }, new Map<string, SObjectDescribeField>())
       : undefined),
@@ -321,6 +331,8 @@ export default function QueryBuilder({
     return [];
   }, [fieldMap, draftQuery?.selectedColumns]);
 
+  const selectedColumns = draftQuery?.selectedColumns;
+
   const { results: relationshipDescribes } = useSalesforceApi<{
     hasErrors: boolean;
     results: { result: SObjectDescribeResult; statusCode: number }[];
@@ -333,23 +345,73 @@ export default function QueryBuilder({
     useCache: false,
     method: 'POST',
     data: {
-      batchRequests: selectedChildRelationships.map((sobjectName) => ({
-        method: 'GET',
-        url: `v56.0/sobjects/${sobjectName}/describe`,
-      })),
+      batchRequests: [...new Set(selectedChildRelationships)].map(
+        (sobjectName) => ({
+          method: 'GET',
+          url: `v56.0/sobjects/${sobjectName}/describe`,
+        }),
+      ),
     },
   });
+  const relationshipSObjects = useMemo(() => {
+    return relationshipDescribes?.results.reduce((map, sobject) => {
+      map.set(sobject.result.name, sobject.result);
+      return map;
+    }, new Map<string, SObjectDescribeResult>());
+  }, [relationshipDescribes]);
 
-  console.log('fieldMap', fieldMap, relationshipDescribes);
+  console.log(
+    'fieldMap',
+    fieldMap,
+    relationshipDescribes,
+    selectedChildRelationships,
+  );
 
   const possibleColumns = useMemo(() => {
-    return (
-      currentObjectDescribeResult?.fields.map((o) => ({
+    const selectedRelationships = selectedColumns
+      ?.map((name) => fieldMap?.get(name))
+      .map((field) => (field?.relationshipName && field.referenceTo?.[0]
+        ? {
+          field,
+          relationship: relationshipSObjects?.get(field.referenceTo[0]),
+        }
+        : undefined))
+      .filter((arr) => !!arr)
+      .map((obj) => {
+        const { field, relationship } = obj!;
+        return { field, relationship };
+      });
+    console.log(
+      'selectedRelationships',
+      selectedRelationships,
+      relationshipSObjects,
+    );
+    const groups =
+      selectedRelationships?.flatMap((obj) => {
+        if (obj) {
+          return obj.relationship?.fields.map((o) => ({
+            value: `${obj.field.relationshipName}.${o.name}`,
+            label: o.label,
+            group: `${obj.field.label} Fields`,
+          }));
+        }
+        return [];
+      }).filter(Boolean) ?? [];
+    console.debug('groups', groups);
+    return [
+      ...groups,
+      ...(currentObjectDescribeResult?.fields.map((o) => ({
+        group: 'Test',
         value: o.name,
         label: o.label,
-      })) || []
-    );
-  }, [currentObjectDescribeResult, selectedChildRelationships]);
+      })) || []),
+    ];
+  }, [
+    selectedColumns,
+    fieldMap,
+    currentObjectDescribeResult,
+    relationshipSObjects,
+  ]);
 
   return (
     <Grid>
@@ -382,7 +444,7 @@ export default function QueryBuilder({
           nothingFound="No results found."
           limit={100}
           disabled={currentObjectDescribeResultLoading}
-          value={draftQuery?.selectedColumns}
+          value={selectedColumns}
           onChange={setSelectedColumns}
           data={possibleColumns}
         />
@@ -484,6 +546,38 @@ export default function QueryBuilder({
           label="Limit"
           value={draftQuery?.limit}
           onChange={setLimit}
+        />
+      </Grid.Col>
+      <Grid.Col span={4}>
+        <Select
+          searchable
+          label="Order by"
+          placeholder="Order by"
+          nothingFound="No results found."
+          value={draftQuery?.orderBy?.fieldName}
+          onChange={(v) => setDraftQuery((existing) => ({
+            ...existing,
+            orderBy: { ...existing.orderBy, fieldName: v ?? '' },
+          }))}
+          limit={100}
+          data={
+            currentObjectDescribeResult?.fields.map((o) => ({
+              value: o.name,
+              label: o.label,
+            })) || []
+          }
+        />
+      </Grid.Col>
+      <Grid.Col span={4}>
+        <Select
+          label="Order direction"
+          value={draftQuery?.orderBy?.direction}
+          onChange={(v) => setDraftQuery((existing) => ({
+            ...existing,
+            orderBy: { ...existing.orderBy, direction: v },
+          }))}
+          limit={100}
+          data={[{ value: '', label: '-' }, 'ASC', 'DESC']}
         />
       </Grid.Col>
       {currentObjectDescribeResult?.childRelationships
