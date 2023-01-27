@@ -25,7 +25,10 @@ import useDebounce from '../hooks/useDebounce';
 import useLocalStorage from '../hooks/useLocalStorage';
 import { useSalesforceApi } from '../hooks/useSalesforceQuery';
 import ApiResults from './ApiResults';
-import QueryBuilder, { stringifyQuery } from './QueryBuilder';
+import QueryBuilder, {
+  stringifyQuery,
+  Query as DraftQuery,
+} from './QueryBuilder';
 
 const QueryFieldName = 'query';
 
@@ -42,11 +45,6 @@ type SObjectDescribeResult = {
   fields: SObjectDescribeField[];
 };
 
-interface Query {
-  source: string;
-  selectedColumns: string[];
-}
-
 export default function Query({ cookie }: { cookie: browser.Cookies.Cookie }) {
   const [autorunQuery, setAutorunQuery] = useLocalStorage<boolean>(
     `autorunQuery:${cookie.domain}`,
@@ -61,82 +59,15 @@ export default function Query({ cookie }: { cookie: browser.Cookies.Cookie }) {
     false,
   );
 
-  const [draftQuery, setDraftQuery] = useLocalStorage<Query>(
+  const [draftQuery, setDraftQuery] = useLocalStorage<DraftQuery>(
     `draftQuery:${cookie.domain}`,
   );
-
-  const selectedObjectName = draftQuery?.source;
 
   const [query, setQuery] = useLocalStorage<string>(
     `currentQuery:${cookie.domain}`,
     'SELECT count() from User',
   );
   const [debounced, immediatelyUpdate] = useDebounce(query);
-
-  const { results: currentObjectDescribeResult } =
-    useSalesforceApi<SObjectDescribeResult>({
-      url: selectedObjectName
-        ? `/services/data/v52.0/sobjects/${selectedObjectName}/describe`
-        : undefined,
-      cookie,
-      useCache: true,
-    });
-
-  const selectedFields =
-    draftQuery?.selectedColumns.length &&
-    currentObjectDescribeResult?.name === draftQuery.source
-      ? currentObjectDescribeResult.fields.filter((field) =>
-        draftQuery.selectedColumns.includes(field.name))
-      : [];
-
-  const otherSObjectsToDescribe: string[] = useMemo(
-    () =>
-      Array.from(
-        currentObjectDescribeResult && draftQuery?.selectedColumns.length
-          ? new Set(
-            currentObjectDescribeResult.fields
-              .filter(
-                (field) =>
-                  draftQuery.selectedColumns.includes(field.name) &&
-                    field.relationshipName,
-              )
-              .flatMap((field) => field.referenceTo!),
-          )
-          : new Set<string>(),
-      ),
-    [currentObjectDescribeResult, draftQuery?.selectedColumns],
-  );
-
-  const { results: relationshipDescribes } = useSalesforceApi<{
-    hasErrors: boolean;
-    results: { result: SObjectDescribeResult; statusCode: number }[];
-  }>({
-    url:
-      otherSObjectsToDescribe.length > 0
-        ? '/services/data/v56.0/composite/batch'
-        : undefined,
-    cookie,
-    useCache: false,
-    method: 'POST',
-    data: {
-      batchRequests: otherSObjectsToDescribe.map((sobjectName) => ({
-        method: 'GET',
-        url: `v56.0/sobjects/${sobjectName}/describe`,
-      })),
-    },
-  });
-
-  const relationshipDescribesMap =
-    otherSObjectsToDescribe.length && relationshipDescribes
-      ? otherSObjectsToDescribe.reduce<
-          Record<string, SObjectDescribeResult | undefined>
-        >((map, name, index) => {
-          return {
-            ...map,
-            [name]: relationshipDescribes.results[index]?.result,
-          };
-        }, {})
-      : undefined;
 
   const handleSubmit: FormEventHandler<HTMLFormElement> = (e) => {
     e.preventDefault();
@@ -196,9 +127,12 @@ export default function Query({ cookie }: { cookie: browser.Cookies.Cookie }) {
       <QueryBuilder
         cookie={cookie}
         onQueryChanged={(q) => {
-          const finalQuery = stringifyQuery(q);
-          if (finalQuery !== query) {
-            setQuery(finalQuery);
+          setDraftQuery(q);
+          if (autorunQuery) {
+            const finalQuery = stringifyQuery(q);
+            if (finalQuery !== query) {
+              setQuery(finalQuery);
+            }
           }
         }}
       />
@@ -208,13 +142,18 @@ export default function Query({ cookie }: { cookie: browser.Cookies.Cookie }) {
           checked={autorunQuery}
           onChange={(e) => setAutorunQuery(e.currentTarget.checked)}
         />
-        <Button ml="sm" disabled={autorunQuery}>
+        <Button
+          ml="sm"
+          disabled={autorunQuery}
+          onClick={() => setQuery(stringifyQuery(draftQuery) ?? '')}
+        >
           Run
         </Button>
       </Group>
 
       <Grid>
         <Grid.Col span={9}>
+          <TextInput value={stringifyQuery(draftQuery)} />
           <Autocomplete
             name={QueryFieldName}
             defaultValue={query}

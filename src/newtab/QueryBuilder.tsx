@@ -18,7 +18,7 @@ import browser from 'webextension-polyfill';
 import useLocalStorage from '../hooks/useLocalStorage';
 import { useSalesforceApi } from '../hooks/useSalesforceQuery';
 
-interface Query {
+export interface Query {
   relationshipNameOrSourceObject: string;
   sourceObject?: string;
   selectedColumns: string[];
@@ -100,7 +100,7 @@ type WhereCondition = {
   id: string;
   field?: string;
   operator?: string;
-  value?: string;
+  value?: string | number;
 };
 
 type SObjectDescribeField = {
@@ -108,6 +108,7 @@ type SObjectDescribeField = {
   label: string;
   relationshipName?: string;
   referenceTo?: string[];
+  type: string;
 };
 
 interface Props {
@@ -121,10 +122,12 @@ interface Props {
 
 function stringifyCondition(condition: WhereCondition): string | undefined {
   if (condition.field && condition.operator) {
+    const { value } = condition;
+    const finalValue = typeof value === 'number' ? `${value}` : `'${value}'`;
     if (condition.operator === 'contains') {
       return `${condition.field} LIKE '%${condition.value}%'`;
     }
-    return `${condition.field} ${condition.operator} '${condition.value}'`;
+    return `${condition.field} ${condition.operator} ${finalValue}`;
   }
   return undefined;
 }
@@ -441,14 +444,29 @@ export default function QueryBuilder({
               />
             </Grid.Col>
             <Grid.Col span={3}>
-              <TextInput
-                label="Value"
-                value={condition.value}
-                onChange={(updates) => updateCondition({
-                  ...condition,
-                  value: updates.target.value,
-                })}
-              />
+              {fieldMap?.get(condition.field ?? '')?.type === 'double' ? (
+                <NumberInput
+                  label="Value"
+                  value={
+                    typeof condition.value === 'number'
+                      ? condition.value
+                      : undefined
+                  }
+                  onChange={(updates) => updateCondition({
+                    ...condition,
+                    value: updates,
+                  })}
+                />
+              ) : (
+                <TextInput
+                  label="Value"
+                  value={condition.value}
+                  onChange={(updates) => updateCondition({
+                    ...condition,
+                    value: updates.target.value,
+                  })}
+                />
+              )}
             </Grid.Col>
             <Grid.Col span={2}>
               <Button onClick={() => removeCondition(condition.id)}>
