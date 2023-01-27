@@ -2,6 +2,7 @@
 /* eslint-disable implicit-arrow-linebreak */
 import {
   Autocomplete,
+  Button,
   Grid,
   Group,
   MultiSelect,
@@ -9,6 +10,7 @@ import {
   Select,
   Switch,
   TextInput,
+  Flex,
 } from '@mantine/core';
 import React, {
   ChangeEventHandler,
@@ -46,6 +48,10 @@ interface Query {
 }
 
 export default function Query({ cookie }: { cookie: browser.Cookies.Cookie }) {
+  const [autorunQuery, setAutorunQuery] = useLocalStorage<boolean>(
+    `autorunQuery:${cookie.domain}`,
+    false,
+  );
   const [recentQueries, setRecentQueries] = useLocalStorage<Array<string>>(
     `recentQueries:${cookie.domain}`,
     [],
@@ -196,6 +202,17 @@ export default function Query({ cookie }: { cookie: browser.Cookies.Cookie }) {
           }
         }}
       />
+      <Group my="xs">
+        <Switch
+          label="Autorun"
+          checked={autorunQuery}
+          onChange={(e) => setAutorunQuery(e.currentTarget.checked)}
+        />
+        <Button ml="sm" disabled={autorunQuery}>
+          Run
+        </Button>
+      </Group>
+
       <Grid>
         <Grid.Col span={9}>
           <Autocomplete

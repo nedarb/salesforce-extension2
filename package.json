@@ -57,8 +57,9 @@
     "chrome >= 98"
   ],
   "dependencies": {
-    "@mantine/core": "^4.2.2",
-    "@mantine/hooks": "^4.2.2",
+    "@emotion/react": "^11.10.5",
+    "@mantine/core": "^5.10.2",
+    "@mantine/hooks": "^5.10.2",
     "@mantine/notifications": "^4.2.8",
     "@types/webextension-polyfill": "^0.8.3",
     "preact": "^10.6.6",

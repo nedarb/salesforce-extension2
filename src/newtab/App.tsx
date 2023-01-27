@@ -71,8 +71,12 @@ function LoggedIntoSalesforce() {
   );
 
   return (
-    <Tabs className="tabs" active={activeTab} onTabChange={setActiveTab}>
-      <Tabs.Tab label={cookie.domain}>
+    <Tabs className="tabs" value={activeTab} onTabChange={setActiveTab}>
+      <Tabs.List>
+        <Tabs.Tab value="explorer">{cookie.domain}</Tabs.Tab>
+        <Tabs.Tab value="query">Query</Tabs.Tab>
+      </Tabs.List>
+      <Tabs.Panel value="explorer">
         <div>
           Logged in to{' '}
           <a href={`https://${cookie.domain}`} target="_blank">
@@ -92,10 +96,10 @@ function LoggedIntoSalesforce() {
             />
           </form>
         </div>
-      </Tabs.Tab>
-      <Tabs.Tab label="Query">
+      </Tabs.Panel>
+      <Tabs.Panel value="query">
         <Query cookie={cookie} />
-      </Tabs.Tab>
+      </Tabs.Panel>
     </Tabs>
   );
 }
@@ -109,7 +113,14 @@ const App = () => {
     return (
       <Paper shadow="xs" p="md">
         <Text>Please log into a Salesforce org!</Text>
-        <Button component="a" href="https://login.salesforce.com" target="_blank" rel="noreferrer">Log in</Button>
+        <Button
+          component="a"
+          href="https://login.salesforce.com"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Log in
+        </Button>
       </Paper>
     );
   }
