@@ -323,13 +323,17 @@ export default function QueryBuilder({
 
   const selectedChildRelationships = useMemo(() => {
     if (fieldMap && draftQuery?.selectedColumns.length) {
-      return [...new Set(draftQuery.selectedColumns
-        .map((col) => {
-          const [name, extended] = col.split('.');
-          return fieldMap.get(name!)?.referenceTo;
-        })
-        .map((referenceTo) => (referenceTo?.length === 1 ? referenceTo[0] : undefined))
-        .filter(Boolean))];
+      return [
+        ...new Set(
+          draftQuery.selectedColumns
+            .map((col) => {
+              const [name, extended] = col.split('.');
+              return fieldMap.get(name!)?.referenceTo;
+            })
+            .map((referenceTo) => (referenceTo?.length === 1 ? referenceTo[0] : undefined))
+            .filter(Boolean),
+        ),
+      ];
     }
     return [];
   }, [fieldMap, draftQuery?.selectedColumns]);
@@ -338,7 +342,7 @@ export default function QueryBuilder({
 
   const selectedColumns = draftQuery?.selectedColumns;
 
-  const { results: relationshipDescribes } = useSalesforceApi<{
+  const { results: relationshipDescribes, isLoading: relationshipDescribesLoading } = useSalesforceApi<{
     hasErrors: boolean;
     results: { result: SObjectDescribeResult; statusCode: number }[];
   }>({
@@ -453,7 +457,7 @@ export default function QueryBuilder({
           placeholder="Select columns"
           nothingFound="No results found."
           limit={100}
-          disabled={currentObjectDescribeResultLoading}
+          disabled={currentObjectDescribeResultLoading || relationshipDescribesLoading}
           value={selectedColumns}
           onChange={setSelectedColumns}
           data={possibleColumns}
