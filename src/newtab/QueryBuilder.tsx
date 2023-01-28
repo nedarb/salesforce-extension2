@@ -323,13 +323,18 @@ export default function QueryBuilder({
 
   const selectedChildRelationships = useMemo(() => {
     if (fieldMap && draftQuery?.selectedColumns.length) {
-      return draftQuery.selectedColumns
-        .map((col) => fieldMap.get(col)?.referenceTo)
+      return [...new Set(draftQuery.selectedColumns
+        .map((col) => {
+          const [name, extended] = col.split('.');
+          return fieldMap.get(name!)?.referenceTo;
+        })
         .map((referenceTo) => (referenceTo?.length === 1 ? referenceTo[0] : undefined))
-        .filter(Boolean);
+        .filter(Boolean))];
     }
     return [];
   }, [fieldMap, draftQuery?.selectedColumns]);
+
+  console.debug('selectedChildRelationships', selectedChildRelationships);
 
   const selectedColumns = draftQuery?.selectedColumns;
 
@@ -369,7 +374,10 @@ export default function QueryBuilder({
 
   const possibleColumns = useMemo(() => {
     const selectedRelationships = selectedColumns
-      ?.map((name) => fieldMap?.get(name))
+      ?.map((col) => {
+        const [name, extended] = col.split('.');
+        return fieldMap?.get(name!);
+      })
       .map((field) => (field?.relationshipName && field.referenceTo?.[0]
         ? {
           field,
@@ -387,24 +395,26 @@ export default function QueryBuilder({
       relationshipSObjects,
     );
     const groups =
-      selectedRelationships?.flatMap((obj) => {
-        if (obj) {
-          return obj.relationship?.fields.map((o) => ({
-            value: `${obj.field.relationshipName}.${o.name}`,
-            label: o.label,
-            group: `${obj.field.label} Fields`,
-          }));
-        }
-        return [];
-      }).filter(Boolean) ?? [];
+      selectedRelationships
+        ?.flatMap((obj) => {
+          if (obj) {
+            return obj.relationship?.fields.map((o) => ({
+              value: `${obj.field.relationshipName}.${o.name}`,
+              label: `${obj.field.label} - ${o.label}`,
+              group: `${obj.field.label} fields`,
+            }));
+          }
+          return [];
+        })
+        .filter(Boolean) ?? [];
     console.debug('groups', groups);
     return [
-      ...groups,
       ...(currentObjectDescribeResult?.fields.map((o) => ({
-        group: 'Test',
+        group: `${currentObjectDescribeResult.label} fields`,
         value: o.name,
         label: o.label,
       })) || []),
+      ...groups,
     ];
   }, [
     selectedColumns,
