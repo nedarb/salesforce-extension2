@@ -131,6 +131,12 @@ function stringifyCondition(condition: WhereCondition): string | undefined {
     if (condition.operator === 'contains') {
       return `${condition.field} LIKE '%${condition.value}%'`;
     }
+    if (condition.operator === 'starts') {
+      return `${condition.field} LIKE '${condition.value}%'`;
+    }
+    if (condition.operator === 'ends') {
+      return `${condition.field} LIKE '%${condition.value}'`;
+    }
     return `${condition.field} ${condition.operator} ${finalValue}`;
   }
   return undefined;
@@ -274,7 +280,7 @@ export default function QueryBuilder({
     const conditions = existing.whereConditions ?? [];
     const newConditions: WhereCondition[] = [
       ...conditions,
-      { id: conditions.length.toString() },
+      { id: Math.random().toString() },
     ];
     return { ...existing, whereConditions: newConditions };
   });
@@ -342,7 +348,10 @@ export default function QueryBuilder({
 
   const selectedColumns = draftQuery?.selectedColumns;
 
-  const { results: relationshipDescribes, isLoading: relationshipDescribesLoading } = useSalesforceApi<{
+  const {
+    results: relationshipDescribes,
+    isLoading: relationshipDescribesLoading,
+  } = useSalesforceApi<{
     hasErrors: boolean;
     results: { result: SObjectDescribeResult; statusCode: number }[];
   }>({
@@ -457,7 +466,9 @@ export default function QueryBuilder({
           placeholder="Select columns"
           nothingFound="No results found."
           limit={100}
-          disabled={currentObjectDescribeResultLoading || relationshipDescribesLoading}
+          disabled={
+            currentObjectDescribeResultLoading || relationshipDescribesLoading
+          }
           value={selectedColumns}
           onChange={setSelectedColumns}
           data={possibleColumns}
@@ -498,12 +509,7 @@ export default function QueryBuilder({
                 value={condition.field}
                 onChange={(v) => updateCondition({ ...condition, field: v ?? undefined })}
                 limit={100}
-                data={
-                  currentObjectDescribeResult?.fields.map((o) => ({
-                    value: o.name,
-                    label: o.label,
-                  })) || []
-                }
+                data={possibleColumns}
               />
             </Grid.Col>
             <Grid.Col span={2}>
