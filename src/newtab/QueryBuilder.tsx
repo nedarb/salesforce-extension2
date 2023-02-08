@@ -100,6 +100,21 @@ const Operators = [
   },
 ];
 
+const BooleanSelectOptions = [
+  {
+    value: 'TRUE',
+    label: 'True',
+  },
+  {
+    value: 'FALSE',
+    label: 'False',
+  },
+  {
+    value: 'NULL',
+    label: 'Null',
+  },
+];
+
 type WhereCondition = {
   id: string;
   field?: string;
@@ -124,18 +139,26 @@ interface Props {
   onQueryChanged?: (query: Query) => void;
 }
 
+function removeQuotes(value: string | number | undefined) {
+  if (typeof value === 'string') {
+    const result = /^['"](.+)['"]$/gm.exec(value);
+    return result && result.length > 1 ? result[1] : value;
+  }
+  return value;
+}
+
 function stringifyCondition(condition: WhereCondition): string | undefined {
   if (condition.field && condition.operator) {
     const { value } = condition;
-    const finalValue = typeof value === 'number' ? `${value}` : `'${value}'`;
+    const finalValue = `${value}`;
     if (condition.operator === 'contains') {
-      return `${condition.field} LIKE '%${condition.value}%'`;
+      return `${condition.field} LIKE '%${removeQuotes(condition.value)}%'`;
     }
     if (condition.operator === 'starts') {
-      return `${condition.field} LIKE '${condition.value}%'`;
+      return `${condition.field} LIKE '${removeQuotes(condition.value)}%'`;
     }
     if (condition.operator === 'ends') {
-      return `${condition.field} LIKE '%${condition.value}'`;
+      return `${condition.field} LIKE '%${removeQuotes(condition.value)}'`;
     }
     return `${condition.field} ${condition.operator} ${finalValue}`;
   }
@@ -168,6 +191,48 @@ export function stringifyQuery(query?: Query) {
     query.relationshipNameOrSourceObject
   } ${condition}${orderBy}${limit}`;
 }
+
+function renderField({
+  fieldType,
+  value,
+  onUpdate,
+}: {
+  fieldType: string;
+  value: string | number | undefined;
+  onUpdate: (value: string | number | undefined | null) => void;
+}) {
+  switch (fieldType) {
+    case 'double':
+      return (
+        <NumberInput
+          label="Value"
+          value={typeof value === 'number' ? value : undefined}
+          onChange={onUpdate}
+        />
+      );
+    case 'boolean': {
+      const parsedValue = value?.toString() ?? '';
+      return (
+        <Select
+          label="Value"
+          value={parsedValue}
+          data={BooleanSelectOptions}
+          onChange={onUpdate}
+        />
+      );
+    }
+    default:
+      return (
+        <TextInput
+          label="Value"
+          value={value}
+          onChange={(updates) => onUpdate(updates.target.value)}
+        />
+      );
+  }
+}
+
+const RenderField = React.memo(renderField);
 
 export default function QueryBuilder({
   cookie,
@@ -498,65 +563,63 @@ export default function QueryBuilder({
         </Grid.Col>
       )}
       <Grid.Col span={12}>
-        {draftQuery?.whereConditions?.map((condition) => (
-          <Grid key={condition.id}>
-            <Grid.Col span={3}>
-              <Select
-                searchable
-                label="Selected column"
-                placeholder="Select column"
-                nothingFound="No results found."
-                value={condition.field}
-                onChange={(v) => updateCondition({ ...condition, field: v ?? undefined })}
-                limit={100}
-                data={possibleColumns}
-              />
-            </Grid.Col>
-            <Grid.Col span={2}>
-              <Select
-                searchable
-                label="Criteria"
-                placeholder="Criteria"
-                value={condition.operator}
-                data={Operators}
-                onChange={(updates) => updateCondition({
-                  ...condition,
-                  operator: updates ?? undefined,
-                })}
-              />
-            </Grid.Col>
-            <Grid.Col span={3}>
-              {fieldMap?.get(condition.field ?? '')?.type === 'double' ? (
-                <NumberInput
-                  label="Value"
-                  value={
-                    typeof condition.value === 'number'
-                      ? condition.value
-                      : undefined
-                  }
+        {draftQuery?.whereConditions?.map((condition) => {
+          const fieldType = fieldMap?.get(condition.field ?? '')?.type;
+          const quotes =
+            fieldType !== 'double' &&
+            fieldType !== 'datetime' &&
+            fieldType !== 'boolean' &&
+            fieldType !== 'date';
+          const currentValue = quotes
+            ? removeQuotes(
+              typeof condition.value === 'string' ? condition.value : '',
+            )
+            : condition.value;
+          return (
+            <Grid key={condition.id}>
+              <Grid.Col span={3}>
+                <Select
+                  searchable
+                  label="Selected column"
+                  placeholder="Select column"
+                  nothingFound="No results found."
+                  value={condition.field}
+                  onChange={(v) => updateCondition({ ...condition, field: v ?? undefined })}
+                  limit={100}
+                  data={possibleColumns}
+                />
+              </Grid.Col>
+              <Grid.Col span={2}>
+                <Select
+                  searchable
+                  label="Criteria"
+                  placeholder="Criteria"
+                  value={condition.operator}
+                  data={Operators}
                   onChange={(updates) => updateCondition({
                     ...condition,
-                    value: updates,
+                    operator: updates ?? undefined,
                   })}
                 />
-              ) : (
-                <TextInput
-                  label="Value"
+              </Grid.Col>
+              <Grid.Col span={3}>
+                <RenderField
+                  fieldType={fieldType ?? ''}
                   value={condition.value}
-                  onChange={(updates) => updateCondition({
+                  onUpdate={(updated) => updateCondition({
                     ...condition,
-                    value: updates.target.value,
+                    value: quotes ? `'${updated}'` : updated,
                   })}
                 />
-              )}
-            </Grid.Col>
-            <Grid.Col span={2}>
-              <Button onClick={() => removeCondition(condition.id)}>
-                Remove
-              </Button>
-            </Grid.Col>
-          </Grid>
-        ))}
+              </Grid.Col>
+              <Grid.Col span={2}>
+                <Button onClick={() => removeCondition(condition.id)}>
+                  Remove
+                </Button>
+              </Grid.Col>
+            </Grid>
+          );
+        })}
         <Button onClick={addCondition} mt="md">
           Add condition
         </Button>
@@ -580,12 +643,7 @@ export default function QueryBuilder({
             orderBy: { ...existing.orderBy, fieldName: v ?? '' },
           }))}
           limit={100}
-          data={
-            currentObjectDescribeResult?.fields.map((o) => ({
-              value: o.name,
-              label: o.label,
-            })) || []
-          }
+          data={possibleColumns}
         />
       </Grid.Col>
       <Grid.Col span={4}>
