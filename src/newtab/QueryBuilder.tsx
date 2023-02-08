@@ -192,15 +192,13 @@ export function stringifyQuery(query?: Query) {
   } ${condition}${orderBy}${limit}`;
 }
 
-function renderField({
-  fieldType,
-  value,
-  onUpdate,
-}: {
+interface RenderFieldProps {
   fieldType: string;
   value: string | number | undefined;
   onUpdate: (value: string | number | undefined | null) => void;
-}) {
+}
+
+function renderField({ fieldType, value, onUpdate }: RenderFieldProps) {
   switch (fieldType) {
     case 'double':
       return (
