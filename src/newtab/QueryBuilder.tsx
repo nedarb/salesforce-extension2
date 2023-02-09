@@ -603,7 +603,7 @@ export default function QueryBuilder({
               <Grid.Col span={3}>
                 <RenderField
                   fieldType={fieldType ?? ''}
-                  value={condition.value}
+                  value={currentValue}
                   onUpdate={(updated) => updateCondition({
                     ...condition,
                     value: quotes ? `'${updated}'` : updated,
