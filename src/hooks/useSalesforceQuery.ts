@@ -200,28 +200,29 @@ export function useSalesforceApiCaller({
   return apiCaller;
 }
 
-class FetchWrapper {
-  private ongoingCalls = new Map<string, Promise<Response>>();
-
-  fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+const fetchWrapper = (() => {
+  const ongoingCalls = new Map<string, Promise<Response>>();
+  const myFetch = (
+    input: RequestInfo | URL,
+    init?: RequestInit,
+  ): Promise<Response> => {
     const cacheKey = JSON.stringify(input);
-    const existing = this.ongoingCalls.get(cacheKey);
+    const existing = ongoingCalls.get(cacheKey);
     if (existing) {
       return existing;
     }
 
     const result = fetch(input, init);
-    this.ongoingCalls.set(cacheKey, result);
-    result.finally(() => this.ongoingCalls.delete(cacheKey));
+    ongoingCalls.set(cacheKey, result);
+    result.finally(() => ongoingCalls.delete(cacheKey));
     return result;
-  }
-}
-
-const fetchWrapper = new FetchWrapper();
+  };
+  return { fetch: myFetch };
+})();
 
 export function useSalesforceApi<
   T = any,
-  TError = Array<{ errorCode: string; message: string }>,
+  TError = Array<{ errorCode: string; message: string }>
 >({
   url,
   cookie,

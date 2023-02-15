@@ -57,27 +57,6 @@ const Actions:Array<SelectItem> = [UpdateAction,
   { value: 'delete', label: 'Delete' },
   RelationshipsAction];
 
-class ActionCache {
-    private readonly cache: Record<string, SelectItem> = {};
-
-    public getFromValue(value: string): SelectItem | undefined {
-      if (value in this.cache) {
-        return this.cache[value];
-      }
-
-      return undefined;
-    }
-
-    public get(value: string, label: string): SelectItem {
-      if (!this.cache[value]) {
-        this.cache[value] = { value, label };
-      }
-      return this.cache[value]!;
-    }
-}
-
-const actionCache = new ActionCache();
-
 async function getOptions(
   apiCaller: ApiCaller,
   sobjectName: string | undefined,

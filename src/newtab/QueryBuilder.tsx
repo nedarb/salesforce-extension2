@@ -488,7 +488,7 @@ export default function QueryBuilder({
       ...(currentObjectDescribeResult?.fields.map((o) => ({
         group: `${currentObjectDescribeResult.label} fields`,
         value: o.name,
-        label: o.label,
+        label: [o.label, o.relationshipName ? `(${o.relationshipName})` : o.relationshipName].filter(Boolean).join(' '),
       })) || []),
       ...groups,
     ];
