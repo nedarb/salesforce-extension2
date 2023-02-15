@@ -71,7 +71,7 @@ export function makeApiCall<T = any>({
     ? url
     : new URL(url, `https://${cookie.domain}`);
 
-  const cacheKey = `apiResult:${url.toString()}`;
+  const cacheKey = `apiResult:${cookie.domain}:${url.toString()}`;
   if (useCache) {
     const fromStorage = localStorage.getItem(cacheKey);
     if (fromStorage) {
