@@ -71,7 +71,7 @@ export function makeApiCall<T = any>({
     ? url
     : new URL(url, `https://${cookie.domain}`);
 
-  const cacheKey = `apiResult:${cookie.domain}:${url.toString()}`;
+  const cacheKey = `${cookie.domain}:apiResult:${url.toString()}`;
   if (useCache) {
     const fromStorage = localStorage.getItem(cacheKey);
     if (fromStorage) {
@@ -249,7 +249,7 @@ export function useSalesforceApi<
         ? url
         : new URL(url, `https://${cookie.domain}`);
 
-      const cacheKey = `apiResult:${cookie.domain}:${url.toString()}`;
+      const cacheKey = `${cookie.domain}:apiResult:${url.toString()}`;
       if (useCache) {
         const fromStorage = localStorage.getItem(cacheKey);
         if (fromStorage) {

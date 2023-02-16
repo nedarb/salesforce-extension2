@@ -47,24 +47,24 @@ type SObjectDescribeResult = {
 
 export default function Query({ cookie }: { cookie: browser.Cookies.Cookie }) {
   const [autorunQuery, setAutorunQuery] = useLocalStorage<boolean>(
-    `autorunQuery:${cookie.domain}`,
+    `${cookie.domain}:autorunQuery`,
     false,
   );
   const [recentQueries, setRecentQueries] = useLocalStorage<Array<string>>(
-    `recentQueries:${cookie.domain}`,
+    `${cookie.domain}:recentQueries`,
     [],
   );
   const [showAsTable, setShowAsTable] = useLocalStorage(
-    `query_result:show_as_table:${cookie.domain}`,
+    `${cookie.domain}:query_result:show_as_table`,
     false,
   );
 
   const [draftQuery, setDraftQuery] = useLocalStorage<DraftQuery>(
-    `draftQuery:${cookie.domain}`,
+    `${cookie.domain}:draftQuery`,
   );
 
   const [query, setQuery] = useLocalStorage<string>(
-    `currentQuery:${cookie.domain}`,
+    `${cookie.domain}:currentQuery`,
     'SELECT count() from User',
   );
   const [debounced, immediatelyUpdate] = useDebounce(query);
