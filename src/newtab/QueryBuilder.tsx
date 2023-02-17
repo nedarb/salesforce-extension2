@@ -31,6 +31,7 @@ export interface Query {
   whereConditions?: WhereCondition[];
   limit?: number;
   orderBy?: OrderBy;
+  groupBy?: string[];
 }
 
 type SObjectDescribeResult = {
@@ -46,6 +47,17 @@ type SObjectDescribeResult = {
     restrictedDelete: boolean;
   }[];
 };
+
+const AggregateFieldRegex = /(\w+)\((\w+(?:\.\w+)*)\)(?:\s+(\w+))?/im;
+
+const AggregateFunctions = [
+  'AVG',
+  'COUNT',
+  'COUNT_DISTINCT',
+  'MIN',
+  'MAX',
+  'SUM',
+];
 
 const Operators = [
   {
@@ -185,13 +197,16 @@ export function stringifyQuery(query?: Query) {
       .filter(Boolean)
       .join(' AND ')}`
     : '';
+  const groupBy = query?.groupBy?.length
+    ? ` GROUP BY ${query.groupBy?.join(', ')}`
+    : '';
   const limit = (query.limit ?? 0) > 0 ? ` LIMIT ${query.limit}` : '';
   const orderBy = query.orderBy?.fieldName
     ? ` ORDER BY ${query.orderBy?.fieldName} ${query.orderBy.direction ?? ''}`
     : '';
   return `SELECT ${cols.join(', ')} FROM ${
     query.relationshipNameOrSourceObject
-  } ${condition}${orderBy}${limit}`;
+  } ${condition}${groupBy}${orderBy}${limit}`;
 }
 
 interface RenderFieldProps {
@@ -291,10 +306,6 @@ export default function QueryBuilder({
     cookie,
     useCache: true,
   });
-  console.debug(
-    `currentObjectDescribeResult${specificObject}`,
-    currentObjectDescribeResult,
-  );
 
   const setSourceObject = (source: string) => {
     const selectedColumns =
@@ -409,8 +420,6 @@ export default function QueryBuilder({
     return [];
   }, [fieldMap, draftQuery?.selectedColumns]);
 
-  console.debug('selectedChildRelationships', selectedChildRelationships);
-
   const selectedColumns = draftQuery?.selectedColumns;
 
   const {
@@ -443,19 +452,33 @@ export default function QueryBuilder({
     }, new Map<string, SObjectDescribeResult>());
   }, [relationshipDescribes]);
 
-  console.log(
-    'fieldMap',
-    fieldMap,
-    relationshipDescribes,
-    selectedChildRelationships,
-  );
+  const parsedSelectedColumns = useMemo(() => {
+    return draftQuery?.selectedColumns.map((selectedCol) => {
+      const aggregateFieldMatch = AggregateFieldRegex.exec(selectedCol);
+      if (aggregateFieldMatch && aggregateFieldMatch.length > 2) {
+        const col = aggregateFieldMatch[2]!;
+        return {
+          type: 'aggregate',
+          fn: aggregateFieldMatch[1],
+          fullName: selectedCol,
+          baseName: col.split('.')[0]!,
+        };
+      }
+      if (selectedCol.includes('.')) {
+        return {
+          type: 'relationship',
+          fullName: selectedCol,
+          baseName: selectedCol.split('.')[0]!,
+        };
+      }
+      return { type: 'simple', fullName: selectedCol, baseName: selectedCol };
+    });
+  }, [draftQuery?.selectedColumns]);
 
   const possibleColumns = useMemo(() => {
-    const selectedRelationships = selectedColumns
-      ?.map((col) => {
-        const [name, extended] = col.split('.');
-        return fieldMap?.get(name!);
-      })
+    const selectedRelationships = parsedSelectedColumns
+      ?.filter((col) => col.baseName !== col.fullName)
+      .map((col) => fieldMap?.get(col.baseName))
       .map((field) => (field?.relationshipName && field.referenceTo?.[0]
         ? {
           field,
@@ -467,11 +490,6 @@ export default function QueryBuilder({
         const { field, relationship } = obj!;
         return { field, relationship };
       });
-    console.log(
-      'selectedRelationships',
-      selectedRelationships,
-      relationshipSObjects,
-    );
     const groups =
       selectedRelationships
         ?.flatMap((obj) => {
@@ -485,8 +503,16 @@ export default function QueryBuilder({
           return [];
         })
         .filter(Boolean) ?? [];
-    console.debug('groups', groups);
+    const aggregateColumns =
+      parsedSelectedColumns
+        ?.filter((col) => col.type === 'aggregate')
+        .map((col) => ({
+          group: 'Aggregate columns',
+          value: col.fullName,
+          label: col.fullName,
+        })) ?? [];
     return [
+      ...aggregateColumns,
       ...(currentObjectDescribeResult?.fields.map((o) => ({
         group: `${currentObjectDescribeResult.label} fields`,
         value: o.name,
@@ -500,11 +526,26 @@ export default function QueryBuilder({
       ...groups,
     ];
   }, [
-    selectedColumns,
+    parsedSelectedColumns,
     fieldMap,
     currentObjectDescribeResult,
     relationshipSObjects,
   ]);
+
+  const aggregateColumns = useMemo(() => {
+    if (draftQuery) {
+      const groupBy = new Set(draftQuery.groupBy);
+      return draftQuery.selectedColumns
+        .map((col, index) => ({ col, index }))
+        .filter(({ col }) => !groupBy.has(col))
+        .map(({ col, index }) => ({
+          col,
+          index,
+          matches: AggregateFieldRegex.exec(col) ?? [],
+        }));
+    }
+    return [];
+  }, [draftQuery]);
 
   return (
     <Grid>
@@ -567,6 +608,53 @@ export default function QueryBuilder({
           />
         </Grid.Col>
       )}
+
+      {aggregateColumns.length > 0 &&
+        aggregateColumns.map((column) => {
+          const { col, index, matches } = column;
+          const functionName = matches[1];
+          const columnName = matches[2] ?? col;
+          return (
+            <Grid.Col span={4} key={col}>
+              <Select
+                searchable
+                label={`Aggregate for: ${col}`}
+                nothingFound="No results found."
+                limit={100}
+                disabled={
+                  currentObjectDescribeResultLoading ||
+                  relationshipDescribesLoading
+                }
+                value={functionName}
+                onChange={(e) => setDraftQuery((existing) => {
+                  const { selectedColumns: currentcols } = existing;
+                  const copy = [...currentcols];
+                  copy[index] = e
+                    ? `${functionName}(${columnName})`
+                    : columnName;
+                  return { ...existing, selectedColumns: copy };
+                })}
+                data={AggregateFunctions}
+              />
+            </Grid.Col>
+          );
+        })}
+
+      <Grid.Col span={4}>
+        <MultiSelect
+          searchable
+          label="Group by"
+          placeholder="Group by columns"
+          nothingFound="No results found."
+          limit={100}
+          disabled={
+            currentObjectDescribeResultLoading || relationshipDescribesLoading
+          }
+          value={draftQuery?.groupBy}
+          onChange={(e) => setDraftQuery((existing) => ({ ...existing, groupBy: e }))}
+          data={possibleColumns}
+        />
+      </Grid.Col>
       <Grid.Col span={12}>
         {draftQuery?.whereConditions?.map((condition) => {
           const fieldType = fieldMap?.get(condition.field ?? '')?.type;
