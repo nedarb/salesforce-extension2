@@ -15,6 +15,7 @@ import React, {
 } from 'react';
 
 import browser from 'webextension-polyfill';
+import { StrictUnion } from '../common/StrictUnion';
 import useLocalStorage from '../hooks/useLocalStorage';
 import { useSalesforceApi } from '../hooks/useSalesforceQuery';
 
@@ -249,6 +250,21 @@ function renderField({ fieldType, value, onUpdate }: RenderFieldProps) {
 
 const RenderField = React.memo(renderField);
 
+type ParsedColumns = StrictUnion<
+  | {
+      type: 'aggregate';
+      fn?: string;
+      fullName: string;
+      baseName: string;
+    }
+  | {
+      type: 'relationship';
+      fullName: string;
+      baseName: string;
+    }
+  | { type: 'simple'; fullName: string; baseName: string }
+>;
+
 export default function QueryBuilder({
   cookie,
   relationshipName,
@@ -285,6 +301,31 @@ export default function QueryBuilder({
       },
     )
     : useLocalStorage<Query>(`draftRichQuery:${cookie.domain}`);
+
+  const parsedSelectedColumns = useMemo(() => {
+    return (
+      draftQuery?.selectedColumns.map<ParsedColumns>((selectedCol) => {
+        const aggregateFieldMatch = AggregateFieldRegex.exec(selectedCol);
+        if (aggregateFieldMatch && aggregateFieldMatch.length > 2) {
+          const col = aggregateFieldMatch[2]!;
+          return {
+            type: 'aggregate',
+            fn: aggregateFieldMatch[1],
+            fullName: selectedCol,
+            baseName: col.split('.')[0]!,
+          };
+        }
+        if (selectedCol.includes('.')) {
+          return {
+            type: 'relationship',
+            fullName: selectedCol,
+            baseName: selectedCol.split('.')[0]!,
+          };
+        }
+        return { type: 'simple', fullName: selectedCol, baseName: selectedCol };
+      }) ?? []
+    );
+  }, [draftQuery?.selectedColumns]);
 
   useEffect(() => {
     console.log('UPDATED QUERY: ', stringifyQuery(draftQuery));
@@ -404,13 +445,13 @@ export default function QueryBuilder({
   );
 
   const selectedChildRelationships = useMemo(() => {
-    if (fieldMap && draftQuery?.selectedColumns.length) {
+    if (fieldMap && parsedSelectedColumns.length) {
       return [
         ...new Set(
-          draftQuery.selectedColumns
+          parsedSelectedColumns
             .map((col) => {
-              const [name, extended] = col.split('.');
-              return fieldMap.get(name!)?.referenceTo;
+              const name = col.baseName;
+              return fieldMap.get(name)?.referenceTo;
             })
             .map((referenceTo) => (referenceTo?.length === 1 ? referenceTo[0] : undefined))
             .filter(Boolean),
@@ -418,7 +459,7 @@ export default function QueryBuilder({
       ];
     }
     return [];
-  }, [fieldMap, draftQuery?.selectedColumns]);
+  }, [fieldMap, parsedSelectedColumns]);
 
   const selectedColumns = draftQuery?.selectedColumns;
 
@@ -445,6 +486,7 @@ export default function QueryBuilder({
       ),
     },
   });
+
   const relationshipSObjects = useMemo(() => {
     return relationshipDescribes?.results.reduce((map, sobject) => {
       map.set(sobject.result.name, sobject.result);
@@ -452,32 +494,9 @@ export default function QueryBuilder({
     }, new Map<string, SObjectDescribeResult>());
   }, [relationshipDescribes]);
 
-  const parsedSelectedColumns = useMemo(() => {
-    return draftQuery?.selectedColumns.map((selectedCol) => {
-      const aggregateFieldMatch = AggregateFieldRegex.exec(selectedCol);
-      if (aggregateFieldMatch && aggregateFieldMatch.length > 2) {
-        const col = aggregateFieldMatch[2]!;
-        return {
-          type: 'aggregate',
-          fn: aggregateFieldMatch[1],
-          fullName: selectedCol,
-          baseName: col.split('.')[0]!,
-        };
-      }
-      if (selectedCol.includes('.')) {
-        return {
-          type: 'relationship',
-          fullName: selectedCol,
-          baseName: selectedCol.split('.')[0]!,
-        };
-      }
-      return { type: 'simple', fullName: selectedCol, baseName: selectedCol };
-    });
-  }, [draftQuery?.selectedColumns]);
-
   const possibleColumns = useMemo(() => {
     const selectedRelationships = parsedSelectedColumns
-      ?.filter((col) => col.baseName !== col.fullName)
+      ?.filter((col) => fieldMap?.get(col.baseName)?.relationshipName)
       .map((col) => fieldMap?.get(col.baseName))
       .map((field) => (field?.relationshipName && field.referenceTo?.[0]
         ? {
