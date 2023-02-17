@@ -18,6 +18,11 @@ import browser from 'webextension-polyfill';
 import useLocalStorage from '../hooks/useLocalStorage';
 import { useSalesforceApi } from '../hooks/useSalesforceQuery';
 
+type OrderBy = {
+  fieldName: string;
+  direction?: string;
+};
+
 export interface Query {
   relationshipNameOrSourceObject: string;
   sourceObject?: string;
@@ -25,10 +30,7 @@ export interface Query {
   relationshipQueries?: Query[];
   whereConditions?: WhereCondition[];
   limit?: number;
-  orderBy?: {
-    fieldName: string;
-    direction?: string;
-  };
+  orderBy?: OrderBy;
 }
 
 type SObjectDescribeResult = {
@@ -488,7 +490,12 @@ export default function QueryBuilder({
       ...(currentObjectDescribeResult?.fields.map((o) => ({
         group: `${currentObjectDescribeResult.label} fields`,
         value: o.name,
-        label: [o.label, o.relationshipName ? `(${o.relationshipName})` : o.relationshipName].filter(Boolean).join(' '),
+        label: [
+          o.label,
+          o.relationshipName ? `(${o.relationshipName})` : o.relationshipName,
+        ]
+          .filter(Boolean)
+          .join(' '),
       })) || []),
       ...groups,
     ];
