@@ -533,7 +533,7 @@ export default function QueryBuilder({
   ]);
 
   const aggregateColumns = useMemo(() => {
-    if (draftQuery) {
+    if (draftQuery && draftQuery.groupBy?.length) {
       const groupBy = new Set(draftQuery.groupBy);
       return draftQuery.selectedColumns
         .map((col, index) => ({ col, index }))
