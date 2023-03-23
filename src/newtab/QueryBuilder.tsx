@@ -453,7 +453,8 @@ export default function QueryBuilder({
               const name = col.baseName;
               return fieldMap.get(name)?.referenceTo;
             })
-            .map((referenceTo) => (referenceTo?.length === 1 ? referenceTo[0] : undefined))
+            .map((referenceTo) => (referenceTo && referenceTo.length > 0 ? referenceTo : []))
+            .flat()
             .filter(Boolean),
         ),
       ];
