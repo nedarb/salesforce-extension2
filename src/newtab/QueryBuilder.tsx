@@ -15,6 +15,7 @@ import React, {
 } from 'react';
 
 import browser from 'webextension-polyfill';
+import { byStringSelector } from '../common/sorters';
 import { StrictUnion } from '../common/StrictUnion';
 import useLocalStorage from '../hooks/useLocalStorage';
 import { useSalesforceApi } from '../hooks/useSalesforceQuery';
@@ -274,6 +275,18 @@ export default function QueryBuilder({
   onQueryChanged,
 }: Props) {
   const currentDepth = depth ?? 1;
+
+  const versionsResult = useSalesforceApi<{ label: string; version: string }[]>(
+    {
+      url: '/services/data/',
+      cookie,
+      useCache: true,
+    },
+  );
+  const latestApiVersion = versionsResult.results?.sort(
+    byStringSelector((e) => e.version),
+  )?.[versionsResult.results.length - 1]?.version ?? '55.0';
+
   const {
     results: globalResults,
     isLoading: queryableObjectsLoading,
@@ -281,7 +294,7 @@ export default function QueryBuilder({
   } = useSalesforceApi<{
     sobjects: { name: string; label: string; queryable: boolean }[];
   }>({
-    url: '/services/data/v56.0/sobjects',
+    url: `/services/data/v${latestApiVersion}/sobjects`,
     cookie,
     useCache: true,
   });
@@ -342,7 +355,7 @@ export default function QueryBuilder({
     isLoading: currentObjectDescribeResultLoading,
   } = useSalesforceApi<SObjectDescribeResult>({
     url: selectedObjectName
-      ? `/services/data/v52.0/sobjects/${selectedObjectName}/describe`
+      ? `/services/data/v${latestApiVersion}/sobjects/${selectedObjectName}/describe`
       : undefined,
     cookie,
     useCache: true,
@@ -473,7 +486,7 @@ export default function QueryBuilder({
   }>({
     url:
       selectedChildRelationships.length > 0
-        ? '/services/data/v56.0/composite/batch'
+        ? `/services/data/v${latestApiVersion}/composite/batch`
         : undefined,
     cookie,
     useCache: false,
@@ -482,7 +495,7 @@ export default function QueryBuilder({
       batchRequests: [...new Set(selectedChildRelationships)].map(
         (sobjectName) => ({
           method: 'GET',
-          url: `v56.0/sobjects/${sobjectName}/describe`,
+          url: `v${latestApiVersion}/sobjects/${sobjectName}/describe`,
         }),
       ),
     },
