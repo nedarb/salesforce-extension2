@@ -2,8 +2,11 @@
 export const LocalhostSuffix = '.lightning.localhost.sfdcdev.force.com';
 export const SalesforceDomains = [
   '.lightning.force.com',
+  '.lightning.pc-rnd.force.com',
   '.my.salesforce.com',
   '.my.localhost.sfdcdev.salesforce.com',
+  '.my.pc-rnd.salesforce.com',
+  '.my.pc-rnd.salesforce-setup.com',
   LocalhostSuffix,
 ];
 
@@ -14,11 +17,23 @@ interface Mapper {
 const Mappers: Mapper[] = [
   {
     test: /(\w+)\.lightning\.localhost\.sfdcdev\.force\.com/i,
-    convert: (matchResult: string, name: string) => `${name}.lightning.localhost.sfdcdev.force.com`,
+    convert: (_: string, name: string) => `${name}.lightning.localhost.sfdcdev.force.com`,
   },
   {
     test: /(\w+)\.my\.localhost\.sfdcdev\.salesforce\.com/i,
     convert: (matchResult: string) => `https://${matchResult}`,
+  },
+  {
+    test: /([\w-]+)\.develop\.test1\.my\.pc-rnd\.salesforce\.com/i,
+    convert: (matchResult: string) => `https://${matchResult}/`,
+  },
+  {
+    test: /([\w-]+)\.develop\.test1\.my\.pc-rnd\.salesforce-setup\.com/i,
+    convert: (_, mydomain) => `https://${mydomain}.develop.test1.my.pc-rnd.salesforce.com/`,
+  },
+  {
+    test: /([\w-]+)\.develop\.test1\.lightning\.pc-rnd\.force\.com/i,
+    convert: (_, mydomain) => `https://${mydomain}.develop.test1.my.pc-rnd.salesforce.com/`,
   },
 ];
 

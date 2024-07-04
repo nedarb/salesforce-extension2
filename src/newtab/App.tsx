@@ -5,15 +5,12 @@ import React, {
   useCallback,
   useContext,
   useEffect,
-  useMemo,
   useState,
 } from 'react';
-import browser from 'webextension-polyfill';
 import {
   Paper, Tabs, Button, Text,
 } from '@mantine/core';
 import urlToSalesforceMyDomain from '../common/SalesforceUtils';
-import useBrowserCookie from '../hooks/useBrowserCookie';
 import useDebounce from '../hooks/useDebounce';
 import useHash from '../hooks/useHash';
 import ApiResults from './ApiResults';
