@@ -16,6 +16,10 @@ interface Mapper {
 }
 const Mappers: Mapper[] = [
   {
+    test: /([\w-]+)\.(\w+)\.test1\.lightning\.pc-rnd\.force\.com/i,
+    convert: (_, mydomain, other) => `https://${mydomain}.${other}.test1.my.pc-rnd.salesforce.com/`,
+  },
+  {
     test: /(\w+)\.lightning\.localhost\.sfdcdev\.force\.com/i,
     convert: (_: string, name: string) => `${name}.lightning.localhost.sfdcdev.force.com`,
   },
@@ -28,12 +32,8 @@ const Mappers: Mapper[] = [
     convert: (matchResult: string) => `https://${matchResult}/`,
   },
   {
-    test: /([\w-]+)\.develop\.test1\.my\.pc-rnd\.salesforce-setup\.com/i,
-    convert: (_, mydomain) => `https://${mydomain}.develop.test1.my.pc-rnd.salesforce.com/`,
-  },
-  {
-    test: /([\w-]+)\.develop\.test1\.lightning\.pc-rnd\.force\.com/i,
-    convert: (_, mydomain) => `https://${mydomain}.develop.test1.my.pc-rnd.salesforce.com/`,
+    test: /([\w-]+)\.(\w+)\.test1\.my\.pc-rnd\.salesforce-setup\.com/i,
+    convert: (_, mydomain, other) => `https://${mydomain}.${other}.test1.my.pc-rnd.salesforce.com/`,
   },
 ];
 

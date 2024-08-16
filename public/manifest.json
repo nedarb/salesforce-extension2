@@ -23,7 +23,7 @@
     "https://*.my.salesforce.com/*",
     "https://*.my.localhost.sfdcdev.salesforce.com/*",
     "https://*.lightning.localhost.sfdcdev.force.com/*",
-    "https://*.develop.test1.my.pc-rnd.salesforce.com/*",
+    "https://*.test1.my.pc-rnd.salesforce.com/*",
     "https://*.my.pc-rnd.salesforce-setup.com",
     "https://*.lightning.pc-rnd.force.com"
   ],
