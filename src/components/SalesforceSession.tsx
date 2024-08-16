@@ -23,6 +23,8 @@ export default function SalesforceSession ({ domain: simpleDomain, children, noT
     name: 'sid',
   });
 
+  console.log('domain', domain, simpleDomain, cookie);
+
   const onSessionExpired = useCallback(
     (possibleError?: any) => {
       setSessionExpired(true);
