@@ -222,7 +222,7 @@ const fetchWrapper = (() => {
 
 export function useSalesforceApi<
   T = any,
-  TError = Array<{ errorCode: string; message: string }>
+  TError = Array<{ errorCode: string; message: string }>,
 >({
   url,
   cookie,
@@ -309,12 +309,12 @@ export function useSalesforceApi<
         })
         .catch(setError)
         .finally(() => {
+          setIsLoading(false);
           if (signal.aborted) {
             return;
           }
-          setIsLoading(false);
         });
-      return () => controller.abort();
+      return () => controller.abort(`aborting useSalesforceQuery for ${url}`);
     }
     setResults(undefined);
 
