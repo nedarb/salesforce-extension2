@@ -147,7 +147,7 @@ const App = () => {
       />
       <Button
         component="a"
-        href="https://login.salesforce.com"
+        href={`https://${lastDomainUsed ?? 'login.salesforce.com'}`}
         target="_blank"
         rel="noreferrer"
       >
