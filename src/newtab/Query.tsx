@@ -23,12 +23,13 @@ import React, {
 import browser from 'webextension-polyfill';
 import useDebounce from '../hooks/useDebounce';
 import useLocalStorage from '../hooks/useLocalStorage';
-import { useSalesforceApi } from '../hooks/useSalesforceQuery';
+import useSalesforceQuery, { useSalesforceApi } from '../hooks/useSalesforceQuery';
 import ApiResults from './ApiResults';
 import QueryBuilder, {
   stringifyQuery,
   Query as DraftQuery,
 } from './QueryBuilder';
+import { byStringSelector, reverse } from '../common/sorters';
 
 const QueryFieldName = 'query';
 
@@ -101,9 +102,12 @@ export default function Query({ cookie }: { cookie: browser.Cookies.Cookie }) {
     [],
   );
 
-  const url = `/services/data/v52.0/query?q=${encodeURIComponent(
+  const { results: apiVersionResults } = useSalesforceApi<Array<{url: string, version: string;}>>({ cookie, url: `/services/data`});
+  const apiVersionToUse = useMemo(()=> apiVersionResults?.sort(reverse(byStringSelector(o => o.version)))[0], [ apiVersionResults ])?.url;
+
+  const url = apiVersionResults ? `${apiVersionToUse}/query?q=${encodeURIComponent(
     debounced ?? '',
-  )}`;
+  )}` : undefined;
 
   const handleSuccessfulQuery = useCallback(
     (urlUsed: string) => {
