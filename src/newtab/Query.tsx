@@ -5,25 +5,19 @@ import {
   Button,
   Grid,
   Group,
-  MultiSelect,
-  Paper,
-  Select,
   Switch,
   TextInput,
-  Flex,
 } from '@mantine/core';
 import React, {
   ChangeEventHandler,
   FormEventHandler,
   useCallback,
-  useEffect,
   useMemo,
-  useState,
 } from 'react';
 import browser from 'webextension-polyfill';
 import useDebounce from '../hooks/useDebounce';
 import useLocalStorage from '../hooks/useLocalStorage';
-import useSalesforceQuery, { useSalesforceApi } from '../hooks/useSalesforceQuery';
+import { useSalesforceApi } from '../hooks/useSalesforceQuery';
 import ApiResults from './ApiResults';
 import QueryBuilder, {
   stringifyQuery,
