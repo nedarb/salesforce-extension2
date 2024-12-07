@@ -48,7 +48,7 @@ export default function urlToSalesforceMyDomain(
   url?: string | null,
 ): string | undefined {
   if (url && url.indexOf('://') < 0) {
-    return urlToSalesforceMyDomain(`https://${url}`);
+    return urlToSalesforceMyDomain(`https://${url}/`);
   }
 
   const urlObject = url?.startsWith('http') ? new URL(url) : null;
