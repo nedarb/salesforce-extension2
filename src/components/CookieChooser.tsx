@@ -9,7 +9,8 @@ import { byStringSelector } from '../common/sorters';
 async function getSalesforceSessionCookies() {
   const c = browser.cookies;
   const cookies = (await c?.getAll({ name: 'sid' })) || [];
-  return cookies.filter((cookie) => cookie.domain.endsWith('.my.salesforce.com') || cookie.domain.endsWith('.my.localhost.sfdcdev.salesforce.com'))
+  return cookies.filter((cookie) => cookie.domain.endsWith('.my.salesforce.com') || cookie.domain.endsWith('.my.localhost.sfdcdev.salesforce.com')
+|| cookie.domain.endsWith('.my.pc-rnd.salesforce.com'))
     .sort(byStringSelector((cookie) => cookie.domain));
 }
 

@@ -1,6 +1,11 @@
 /* eslint-disable no-restricted-syntax */
 import {
-  useCallback, useContext, useEffect, useMemo, useRef, useState,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
 } from 'react';
 import browser from 'webextension-polyfill';
 import { v4 as uuid } from 'uuid';
@@ -66,7 +71,7 @@ export function makeApiCall<T = any>({
     ? url
     : new URL(url, `https://${cookie.domain}`);
 
-  const cacheKey = `apiResult:${url.toString()}`;
+  const cacheKey = `${cookie.domain}:apiResult:${url.toString()}`;
   if (useCache) {
     const fromStorage = localStorage.getItem(cacheKey);
     if (fromStorage) {
@@ -118,11 +123,7 @@ export type MakeApiCall<T = any> = (
 export type QueryCaller<T = any> = (query: string) => Promise<T>;
 
 export interface ApiCaller {
-  makeApiCall: <T>(
-    url: string,
-    method?: HttpMethod,
-    data?: any,
-  ) => Promise<T>,
+  makeApiCall: <T>(url: string, method?: HttpMethod, data?: any) => Promise<T>;
   makeApiQuery: <T>(query: string) => Promise<QueryResults<T>>;
 }
 
@@ -191,10 +192,33 @@ export function useSalesforceApiCaller({
     };
   }, [pendingCalls]);
 
-  const apiCaller: ApiCaller = useMemo(() => ({ makeApiCall: makeApiCall1, makeApiQuery }), [makeApiCall1, makeApiQuery]);
+  const apiCaller: ApiCaller = useMemo(
+    () => ({ makeApiCall: makeApiCall1, makeApiQuery }),
+    [makeApiCall1, makeApiQuery],
+  );
 
   return apiCaller;
 }
+
+const fetchWrapper = (() => {
+  const ongoingCalls = new Map<string, Promise<Response>>();
+  const myFetch = (
+    input: RequestInfo | URL,
+    init?: RequestInit,
+  ): Promise<Response> => {
+    const cacheKey = JSON.stringify(input);
+    const existing = ongoingCalls.get(cacheKey);
+    if (existing) {
+      return existing;
+    }
+
+    const result = fetch(input, init);
+    ongoingCalls.set(cacheKey, result);
+    result.finally(() => ongoingCalls.delete(cacheKey));
+    return result;
+  };
+  return { fetch: myFetch };
+})();
 
 export function useSalesforceApi<
   T = any,
@@ -203,13 +227,19 @@ export function useSalesforceApi<
   url,
   cookie,
   useCache,
+  method = 'GET',
+  data,
 }: {
   url?: string;
+  method?: 'GET' | 'POST';
+  data?: any;
 } & BaseParams) {
   const [results, setResults] = useState<T | undefined>(undefined);
   const [error, setError] = useState<TError | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(false);
   const { domain, onSessionExpired } = useContext(SalesforceContext);
+
+  const stringifiedData = data ? JSON.stringify(data) : undefined;
 
   useEffect(() => {
     if (url && cookie) {
@@ -219,7 +249,7 @@ export function useSalesforceApi<
         ? url
         : new URL(url, `https://${cookie.domain}`);
 
-      const cacheKey = `apiResult:${url.toString()}`;
+      const cacheKey = `${cookie.domain}:apiResult:${url.toString()}`;
       if (useCache) {
         const fromStorage = localStorage.getItem(cacheKey);
         if (fromStorage) {
@@ -230,11 +260,17 @@ export function useSalesforceApi<
 
       setIsLoading(true);
       setError(undefined);
-      fetch(finalUrl.toString(), {
-        method: 'GET',
-        headers: { Authorization: `Bearer ${cookie.value}` },
-        signal,
-      })
+      setResults(undefined);
+      fetchWrapper
+        .fetch(finalUrl.toString(), {
+          method,
+          headers: {
+            Authorization: `Bearer ${cookie.value}`,
+            'Content-Type': 'application/json',
+          },
+          signal,
+          body: stringifiedData,
+        })
         .then(async (result) => {
           if (result.ok) {
             if (result.status === 204) {
@@ -260,25 +296,30 @@ export function useSalesforceApi<
             return;
           }
 
+          setResults(result);
+
           // cache results
           if (useCache) {
-            localStorage.setItem(cacheKey, JSON.stringify(result));
+            try {
+              localStorage.setItem(cacheKey, JSON.stringify(result));
+            } catch (e) {
+              console.warn('Problem caching:', e);
+            }
           }
-          setResults(result);
         })
         .catch(setError)
         .finally(() => {
+          setIsLoading(false);
           if (signal.aborted) {
             return;
           }
-          setIsLoading(false);
         });
-      return () => controller.abort();
+      return () => controller.abort(`aborting useSalesforceQuery for ${url}`);
     }
     setResults(undefined);
 
     return () => {};
-  }, [url, cookie]);
+  }, [url, cookie, stringifiedData]);
 
   return { results, isLoading, error };
 }

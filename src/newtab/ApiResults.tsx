@@ -79,7 +79,7 @@ function toCsv(obj: any) {
 }
 
 export interface Props {
-  url: string;
+  url?: string;
   showAsTable?: boolean;
   cookie: browser.Cookies.Cookie;
   onUpdateUrl?: (updated: string) => void;

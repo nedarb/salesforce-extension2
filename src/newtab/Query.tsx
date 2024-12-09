@@ -2,26 +2,64 @@
 /* eslint-disable implicit-arrow-linebreak */
 import {
   Autocomplete,
-  Grid, Group, Switch, TextInput,
+  Button,
+  Grid,
+  Group,
+  Switch,
+  TextInput,
 } from '@mantine/core';
 import React, {
   ChangeEventHandler,
   FormEventHandler,
   useCallback,
-  useState,
+  useMemo,
 } from 'react';
 import browser from 'webextension-polyfill';
 import useDebounce from '../hooks/useDebounce';
 import useLocalStorage from '../hooks/useLocalStorage';
+import { useSalesforceApi } from '../hooks/useSalesforceQuery';
 import ApiResults from './ApiResults';
+import QueryBuilder, {
+  stringifyQuery,
+  Query as DraftQuery,
+} from './QueryBuilder';
+import { byStringSelector, reverse } from '../common/sorters';
 
 const QueryFieldName = 'query';
 
+type SObjectDescribeField = {
+  name: string;
+  label: string;
+  relationshipName?: string;
+  referenceTo?: string[];
+};
+
+type SObjectDescribeResult = {
+  name: string;
+  label: string;
+  fields: SObjectDescribeField[];
+};
+
 export default function Query({ cookie }: { cookie: browser.Cookies.Cookie }) {
-  const [recentQueries, setRecentQueries] = useLocalStorage<Array<string>>(`recentQueries:${cookie.domain}`, []);
-  const [showAsTable, setShowAsTable] = useLocalStorage(`query_result:show_as_table:${cookie.domain}`, false);
+  const [autorunQuery, setAutorunQuery] = useLocalStorage<boolean>(
+    `${cookie.domain}:autorunQuery`,
+    false,
+  );
+  const [recentQueries, setRecentQueries] = useLocalStorage<Array<string>>(
+    `${cookie.domain}:recentQueries`,
+    [],
+  );
+  const [showAsTable, setShowAsTable] = useLocalStorage(
+    `${cookie.domain}:query_result:show_as_table`,
+    false,
+  );
+
+  const [draftQuery, setDraftQuery] = useLocalStorage<DraftQuery>(
+    `${cookie.domain}:draftQuery`,
+  );
+
   const [query, setQuery] = useLocalStorage<string>(
-    `currentQuery:${cookie.domain}`,
+    `${cookie.domain}:currentQuery`,
     'SELECT count() from User',
   );
   const [debounced, immediatelyUpdate] = useDebounce(query);
@@ -39,7 +77,7 @@ export default function Query({ cookie }: { cookie: browser.Cookies.Cookie }) {
 
   const handleKeyUp: React.KeyboardEventHandler<HTMLInputElement> = (e) => {
     if (e.key === 'Enter') {
-      const { value } = (e.target as HTMLInputElement);
+      const { value } = e.target as HTMLInputElement;
       setQuery(value);
       immediatelyUpdate(value);
     }
@@ -53,30 +91,67 @@ export default function Query({ cookie }: { cookie: browser.Cookies.Cookie }) {
     [query],
   );
 
-  const handleToggleChange: ChangeEventHandler<HTMLInputElement> = useCallback((ev) => setShowAsTable(ev.target.checked), []);
+  const handleToggleChange: ChangeEventHandler<HTMLInputElement> = useCallback(
+    (ev) => setShowAsTable(ev.target.checked),
+    [],
+  );
 
-  const url = `/services/data/v52.0/query?q=${encodeURIComponent(
+  const { results: apiVersionResults } = useSalesforceApi<Array<{url: string, version: string;}>>({ cookie, url: `/services/data`});
+  const apiVersionToUse = useMemo(()=> apiVersionResults?.sort(reverse(byStringSelector(o => o.version)))[0], [ apiVersionResults ])?.url;
+
+  const url = apiVersionResults ? `${apiVersionToUse}/query?q=${encodeURIComponent(
     debounced ?? '',
-  )}`;
+  )}` : undefined;
 
-  const handleSuccessfulQuery = useCallback((urlUsed: string) => {
-    const u = new URL(urlUsed, `https://${cookie.domain}`);
-    const actualQuery = u.searchParams.get('q');
+  const handleSuccessfulQuery = useCallback(
+    (urlUsed: string) => {
+      const u = new URL(urlUsed, `https://${cookie.domain}`);
+      const actualQuery = u.searchParams.get('q');
 
-    if (actualQuery) {
-      // save query in recently used queries
-      const newList = [...new Set(recentQueries)];
-      newList.push(actualQuery);
-      setRecentQueries(newList);
-    }
-  }, [url, recentQueries]);
+      if (actualQuery) {
+        // save query in recently used queries
+        const newList = [...new Set(recentQueries)];
+        newList.push(actualQuery);
+        setRecentQueries(newList);
+      }
+    },
+    [url, recentQueries],
+  );
 
-  const queryOptions: Array<string> = [...new Set((recentQueries || []))];
+  const queryOptions: Array<string> = [...new Set(recentQueries || [])];
 
   return (
     <form onSubmit={handleSubmit}>
+      <QueryBuilder
+        cookie={cookie}
+        onQueryChanged={(q) => {
+          setDraftQuery(q);
+          if (autorunQuery) {
+            const finalQuery = stringifyQuery(q);
+            if (finalQuery !== query) {
+              setQuery(finalQuery);
+            }
+          }
+        }}
+      />
+      <Group my="xs">
+        <Switch
+          label="Autorun"
+          checked={autorunQuery}
+          onChange={(e) => setAutorunQuery(e.currentTarget.checked)}
+        />
+        <Button
+          ml="sm"
+          disabled={autorunQuery}
+          onClick={() => setQuery(stringifyQuery(draftQuery) ?? '')}
+        >
+          Run
+        </Button>
+      </Group>
+
       <Grid>
         <Grid.Col span={9}>
+          <TextInput value={stringifyQuery(draftQuery)} />
           <Autocomplete
             name={QueryFieldName}
             defaultValue={query}
@@ -93,10 +168,20 @@ export default function Query({ cookie }: { cookie: browser.Cookies.Cookie }) {
           />
         </Grid.Col>
         <Grid.Col span={3}>
-          <Switch label="Show as table" checked={showAsTable} onChange={handleToggleChange} />
+          <Switch
+            label="Show as table"
+            checked={showAsTable}
+            onChange={handleToggleChange}
+          />
         </Grid.Col>
       </Grid>
-      <ApiResults url={url} cookie={cookie} onUpdateUrl={forcePathUpdate} showAsTable={showAsTable} onSuccessfulQuery={handleSuccessfulQuery} />
+      <ApiResults
+        url={url}
+        cookie={cookie}
+        onUpdateUrl={forcePathUpdate}
+        showAsTable={showAsTable}
+        onSuccessfulQuery={handleSuccessfulQuery}
+      />
     </form>
   );
 }
