@@ -2,23 +2,23 @@
 import {
   Button,
   Grid,
-  Input,
   MultiSelect,
   NumberInput,
-  Paper,
   Select,
   TextInput,
   Title,
 } from '@mantine/core';
 import React, {
-  useMemo, useState, useCallback, useEffect,
+  useMemo, useState, useEffect,
 } from 'react';
 
 import browser from 'webextension-polyfill';
-import { byStringSelector } from '../common/sorters';
 import { StrictUnion } from '../common/StrictUnion';
 import useLocalStorage from '../hooks/useLocalStorage';
-import { useSalesforceApi } from '../hooks/useSalesforceQuery';
+import {
+  useLatestApiVersion,
+  useSalesforceApi,
+} from '../hooks/useSalesforceQuery';
 
 type OrderBy = {
   fieldName: string;
@@ -276,16 +276,7 @@ export default function QueryBuilder({
 }: Props) {
   const currentDepth = depth ?? 1;
 
-  const versionsResult = useSalesforceApi<{ label: string; version: string }[]>(
-    {
-      url: '/services/data/',
-      cookie,
-      useCache: true,
-    },
-  );
-  const latestApiVersion = versionsResult.results?.sort(
-    byStringSelector((e) => e.version),
-  )?.[versionsResult.results.length - 1]?.version ?? '55.0';
+  const latestApiVersion = useLatestApiVersion({ cookie });
 
   const {
     results: globalResults,

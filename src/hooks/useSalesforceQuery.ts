@@ -10,6 +10,7 @@ import {
 import browser from 'webextension-polyfill';
 import { v4 as uuid } from 'uuid';
 import SalesforceContext from '../contexts/SalesforceContext';
+import { byStringSelector } from '../common/sorters';
 
 /**
  * SAMPLE API CALLS
@@ -322,6 +323,24 @@ export function useSalesforceApi<
   }, [url, cookie, stringifiedData]);
 
   return { results, isLoading, error };
+}
+
+export function useLatestApiVersion({ cookie }: BaseParams) {
+  const versionsResult = useSalesforceApi<{ label: string; version: string }[]>(
+    {
+      url: '/services/data/',
+      cookie,
+      useCache: true,
+    },
+  );
+  const latestApiVersion = useMemo(() => {
+    return (
+      versionsResult.results?.sort(byStringSelector((e) => e.version))?.[
+        versionsResult.results.length - 1
+      ]?.version ?? '63.0'
+    );
+  }, [versionsResult]);
+  return latestApiVersion;
 }
 
 export function useSalesforceQueryExplain<T = any>({ query, cookie }: Params) {

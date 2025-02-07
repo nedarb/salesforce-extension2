@@ -6,7 +6,10 @@ export interface Params {
   name: string;
 }
 
-export default function useBrowserCookie({ url, name }: Params): [browser.Cookies.Cookie | undefined, boolean] {
+export default function useBrowserCookie({
+  url,
+  name,
+}: Params): [browser.Cookies.Cookie | undefined, boolean] {
   const [lastUrl, setLastUrl] = useState<string | undefined>(undefined);
   const [cookie, setCookie] = useState<browser.Cookies.Cookie | undefined>(
     undefined,
@@ -18,17 +21,22 @@ export default function useBrowserCookie({ url, name }: Params): [browser.Cookie
   useEffect(() => {
     setLastUrl(url);
 
-
     if (url && cookieApi) {
       setIsLoading(true);
 
-      cookieApi?.get({ url, name }).then((result) => {
-        setCookie(result);
-      }).finally(() => setIsLoading(false));
+      cookieApi
+        ?.get({ url, name })
+        .then((result) => {
+          setCookie(result ?? undefined);
+        })
+        .finally(() => setIsLoading(false));
 
-      const onChange = (changeInfo: browser.Cookies.OnChangedChangeInfoType) => {
+      const onChange = (
+        changeInfo: browser.Cookies.OnChangedChangeInfoType,
+      ) => {
         const { removed, cookie: changedCookie } = changeInfo;
-        const matchesUrlAndName = changedCookie?.domain === domain && changedCookie?.name === name;
+        const matchesUrlAndName =
+          changedCookie?.domain === domain && changedCookie?.name === name;
         if (matchesUrlAndName) {
           if (removed) {
             setCookie(undefined);

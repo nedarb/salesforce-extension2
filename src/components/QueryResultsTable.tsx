@@ -7,9 +7,9 @@ interface Props {
   cookie: browser.Cookies.Cookie;
   queryResults: {
     done: boolean;
-    totalSize: number;
     records: Array<any>;
   };
+  columns?: Map<string, { label: string; type: string; hidden: boolean }>;
 }
 
 function Labelize({
@@ -157,7 +157,7 @@ function RenderCell({
   if (href && name === 'Name') {
     return (
       <td>
-        <a href={href} target="_blank">
+        <a href={href} target="_blank" rel="noreferrer">
           {value}
         </a>
       </td>
@@ -173,7 +173,11 @@ function RenderCell({
   return <td>{value}</td>;
 }
 
-export default function QueryResultsTable({ queryResults, cookie }: Props) {
+export default function QueryResultsTable({
+  queryResults,
+  cookie,
+  columns,
+}: Props) {
   if (!queryResults || !queryResults.records) return null;
   const keys = Object.keys(queryResults.records[0] || {});
   const headerKeys = keys.filter((key) => key !== 'attributes' && key !== 'Id');
@@ -185,9 +189,13 @@ export default function QueryResultsTable({ queryResults, cookie }: Props) {
       <thead>
         <tr>
           <th> </th>
-          {headerKeys.map((key) => (
-            <th key={key}>{key}</th>
-          ))}
+          {headerKeys.map((key) => {
+            const details = columns?.get(key);
+            if (!details?.hidden) {
+              return <th key={key}>{details?.label ?? key}</th>;
+            }
+            return null;
+          })}
           {hasId && !hasName && <th> </th>}
         </tr>
       </thead>
@@ -198,18 +206,24 @@ export default function QueryResultsTable({ queryResults, cookie }: Props) {
           return (
             <tr key={unique}>
               <td>{index + 1}</td>
-              {headerKeys.map((key) => (
-                <RenderCell
-                  key={key}
-                  name={key}
-                  value={row[key]}
-                  href={href}
-                  domain={cookie.domain}
-                />
-              ))}
+              {headerKeys.map((key) => {
+                const column = columns?.get(key);
+                if (!column?.hidden) {
+                  return (
+                    <RenderCell
+                      key={key}
+                      name={key}
+                      value={row[key]}
+                      href={href}
+                      domain={cookie.domain}
+                    />
+                  );
+                }
+                return null;
+              })}
               {hasId && !hasName && (
                 <td>
-                  <a href={href} target="_blank">
+                  <a href={href} target="_blank" rel="noreferrer">
                     🌐
                   </a>
                 </td>

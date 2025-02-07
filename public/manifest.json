@@ -28,7 +28,7 @@
     "https://*.lightning.pc-rnd.force.com"
   ],
   "permissions": [
-    "activeTab"
+    "activeTab", "storage"
   ],
   "optional_permissions": [
     "cookies"

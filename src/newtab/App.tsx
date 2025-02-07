@@ -18,6 +18,7 @@ import Query from './Query';
 import useLocalStorage from '../hooks/useLocalStorage';
 import SalesforceSession from '../components/SalesforceSession';
 import SalesforceContext from '../contexts/SalesforceContext';
+import ListViews from './ListViews';
 
 const url = new URL(window.location.href);
 
@@ -72,6 +73,7 @@ function LoggedIntoSalesforce() {
       <Tabs.List>
         <Tabs.Tab value="explorer">{cookie.domain}</Tabs.Tab>
         <Tabs.Tab value="query">Query</Tabs.Tab>
+        <Tabs.Tab value="listviews">List views</Tabs.Tab>
       </Tabs.List>
       <Tabs.Panel value="explorer">
         <div>
@@ -96,6 +98,9 @@ function LoggedIntoSalesforce() {
       </Tabs.Panel>
       <Tabs.Panel value="query">
         <Query cookie={cookie} />
+      </Tabs.Panel>
+      <Tabs.Panel value="listviews">
+        <ListViews cookie={cookie} />
       </Tabs.Panel>
     </Tabs>
   );

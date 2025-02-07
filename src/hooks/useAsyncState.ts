@@ -1,10 +1,26 @@
 import { useEffect, useState } from 'react';
 
 // T extends (...args: any[]
+export function useAsyncState<T>(
+  generator: () => Promise<T>,
+  defaultValue: T,
+): [T, boolean, React.Dispatch<React.SetStateAction<T>>];
+export function useAsyncState<T>(
+  generator: () => Promise<T>,
+): [
+  T | undefined,
+  boolean,
+  React.Dispatch<React.SetStateAction<T | undefined>>,
+];
 export default function useAsyncState<T>(
   generator: () => Promise<T>,
-): [T | undefined, boolean] {
-  const [value, setValue] = useState<T | undefined>(undefined);
+  defaultValue?: T,
+): [
+  T | undefined,
+  boolean,
+  React.Dispatch<React.SetStateAction<T | undefined>>,
+] {
+  const [value, setValue] = useState<T | undefined>(defaultValue);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -14,7 +30,7 @@ export default function useAsyncState<T>(
       .finally(() => setIsLoading(false));
   }, [generator]);
 
-  return [value, isLoading];
+  return [value, isLoading, setValue];
 }
 
 type Unwrap<T> = T extends Promise<infer U>
