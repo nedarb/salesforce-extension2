@@ -13,7 +13,7 @@
     "build": "webpack --env prod"
   },
   "engines": {
-    "node": ">=14.0 <19"
+    "node": ">=14.0 <=20"
   },
   "devDependencies": {
     "@babel/core": "^7.20.12",

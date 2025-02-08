@@ -121,7 +121,7 @@ export function ListViews({ cookie }: Props) {
   ]);
 
   return (
-    <Tabs className="tabs" value={activeTab} onTabChange={setActiveTab}>
+    <Tabs className="tabs" value={activeTab} onTabChange={setActiveTab} keepMounted={false}>
       <Tabs.List>
         <Tabs.Tab value="addNew">Add new</Tabs.Tab>
         {fullSavedListViews?.map((l) => (
