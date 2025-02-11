@@ -83,6 +83,7 @@ export function ListViews({ cookie }: Props) {
     })),
     [globalResults],
   );
+
   const listViewData = useMemo(() => {
     return (listViewsDescribe?.listviews ?? []).map((l) => ({
       value: l.id,
@@ -121,7 +122,12 @@ export function ListViews({ cookie }: Props) {
   ]);
 
   return (
-    <Tabs className="tabs" value={activeTab} onTabChange={setActiveTab} keepMounted={false}>
+    <Tabs
+      className="tabs"
+      value={activeTab}
+      onTabChange={setActiveTab}
+      keepMounted={false}
+    >
       <Tabs.List>
         <Tabs.Tab value="addNew">Add new</Tabs.Tab>
         {fullSavedListViews?.map((l) => (

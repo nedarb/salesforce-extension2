@@ -11,6 +11,7 @@ import browser from 'webextension-polyfill';
 import { v4 as uuid } from 'uuid';
 import SalesforceContext from '../contexts/SalesforceContext';
 import { byStringSelector } from '../common/sorters';
+import XhrReuse from '../common/XhrReuse';
 
 /**
  * SAMPLE API CALLS
@@ -201,25 +202,7 @@ export function useSalesforceApiCaller({
   return apiCaller;
 }
 
-const fetchWrapper = (() => {
-  const ongoingCalls = new Map<string, Promise<Response>>();
-  const myFetch = (
-    input: RequestInfo | URL,
-    init?: RequestInit,
-  ): Promise<Response> => {
-    const cacheKey = JSON.stringify(input);
-    const existing = ongoingCalls.get(cacheKey);
-    if (existing) {
-      return existing;
-    }
-
-    const result = fetch(input, init);
-    ongoingCalls.set(cacheKey, result);
-    result.finally(() => ongoingCalls.delete(cacheKey));
-    return result;
-  };
-  return { fetch: myFetch };
-})();
+const fetchWrapper2 = new XhrReuse<any[]>();
 
 export function useSalesforceApi<
   T = any,
@@ -262,25 +245,28 @@ export function useSalesforceApi<
       setIsLoading(true);
       setError(undefined);
       setResults(undefined);
-      fetchWrapper
-        .fetch(finalUrl.toString(), {
-          method,
-          headers: {
-            Authorization: `Bearer ${cookie.value}`,
-            'Content-Type': 'application/json',
+      fetchWrapper2
+        .fetch(
+          finalUrl.toString(),
+          {
+            method,
+            headers: {
+              Authorization: `Bearer ${cookie.value}`,
+              'Content-Type': 'application/json',
+            },
+            signal,
+            body: stringifiedData,
           },
-          signal,
-          body: stringifiedData,
-        })
-        .then(async (result) => {
-          if (result.ok) {
-            if (result.status === 204) {
-              return [];
+          async (result) => {
+            if (result.ok) {
+              if (result.status === 204) {
+                return [];
+              }
+              return [await result.json()];
             }
-            return [await result.json()];
-          }
-          return [undefined, await result.json()];
-        })
+            return [undefined, await result.json()];
+          },
+        )
         .then(([result, err]) => {
           if (signal.aborted) {
             return;
@@ -311,9 +297,6 @@ export function useSalesforceApi<
         .catch(setError)
         .finally(() => {
           setIsLoading(false);
-          if (signal.aborted) {
-            return;
-          }
         });
       return () => controller.abort(`aborting useSalesforceQuery for ${url}`);
     }

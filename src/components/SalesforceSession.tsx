@@ -8,22 +8,24 @@ import useBrowserCookie from '../hooks/useBrowserCookie';
 import useBrowserPermission from '../hooks/useBrowserPermission';
 
 interface Props {
-    domain: string;
-    children: ReactNode;
-    noTokenBody?: ReactNode;
+  domain: string;
+  children: ReactNode;
+  noTokenBody?: ReactNode;
 }
-export default function SalesforceSession ({ domain: simpleDomain, children, noTokenBody } : Props) {
+export default function SalesforceSession({
+  domain: simpleDomain,
+  children,
+  noTokenBody,
+}: Props) {
   const domain = urlToSalesforceMyDomain(simpleDomain);
   const [hasPermission, onRequestPermission, onRemovePermission] =
-      useBrowserPermission(domain);
+    useBrowserPermission(domain);
   const [sessionExpired, setSessionExpired] = useState(false);
 
   const [cookie, isCookieLoading] = useBrowserCookie({
     url: hasPermission ? domain : undefined,
     name: 'sid',
   });
-
-  console.log('domain', domain, simpleDomain, cookie);
 
   const onSessionExpired = useCallback(
     (possibleError?: any) => {
@@ -37,7 +39,14 @@ export default function SalesforceSession ({ domain: simpleDomain, children, noT
     return (
       <Paper shadow="xs" p="md">
         <Text>Please log into a Salesforce org!</Text>
-        <Button component="a" href="https://login.salesforce.com" target="_blank" rel="noreferrer">Log in</Button>
+        <Button
+          component="a"
+          href="https://login.salesforce.com"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Log in
+        </Button>
         {noTokenBody}
       </Paper>
     );
@@ -47,13 +56,17 @@ export default function SalesforceSession ({ domain: simpleDomain, children, noT
     return (
       <Paper shadow="xs" p="md">
         <Text>Session has expired for {simpleDomain}</Text>
-        <Button component="a" href={domain} target="_blank" rel="noreferrer">Log back in</Button>
+        <Button component="a" href={domain} target="_blank" rel="noreferrer">
+          Log back in
+        </Button>
         {noTokenBody}
       </Paper>
     );
   }
 
-  if (hasPermission === undefined || isCookieLoading) { return null; }
+  if (hasPermission === undefined || isCookieLoading) {
+    return null;
+  }
   if (hasPermission === false) {
     return (
       <Paper shadow="xs" p="md">
@@ -68,7 +81,9 @@ export default function SalesforceSession ({ domain: simpleDomain, children, noT
     return (
       <Paper shadow="xs" p="md">
         <Text>No cookie present for {simpleDomain}</Text>
-        <Button component="a" href={domain} target="_blank" rel="noreferrer">Log back in</Button>
+        <Button component="a" href={domain} target="_blank" rel="noreferrer">
+          Log back in
+        </Button>
         {noTokenBody}
       </Paper>
     );
